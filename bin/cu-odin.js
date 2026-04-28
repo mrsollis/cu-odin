@@ -237,9 +237,9 @@ function printHelp() {
 cu-odin — Claude Code agent harness installer
 
 Usage:
-  npx @mrsollis/cu-odin               Install harness into current directory (interactive)
-  npx @mrsollis/cu-odin init          Same as default
-  npx @mrsollis/cu-odin init --yes    Accept all defaults non-interactively
+  npx -y github:mrsollis/cu-odin             Install harness into current directory (interactive)
+  npx -y github:mrsollis/cu-odin init        Same as default
+  npx -y github:mrsollis/cu-odin init --yes  Accept all defaults non-interactively
 
 Interactive prompts:
   - Overwrite agents + CLAUDE.md?           (default: no if they exist, yes if not)
