@@ -20,6 +20,7 @@ CLAUDE.md
 │   ├── coder-elite.md           # opus escalation coder (gated)
 │   ├── code-review.md           # standard reviewer (sonnet)
 │   ├── code-review-elite.md     # opus escalation reviewer (gated)
+│   ├── data-architect.md        # Supabase schema / RLS / data security (sonnet)
 │   ├── security-review.md       # OWASP-focused review (sonnet)
 │   └── ux-design.md             # design spec producer (sonnet)
 ├── rules/
@@ -33,14 +34,15 @@ Stack is auto-detected from the repo: `package.json` → web track, `pubspec.yam
 
 ## How odin works
 
-For any non-trivial request, odin runs a 6-phase loop without you needing to invoke it explicitly:
+For any non-trivial request, odin runs a multi-phase loop without you needing to invoke it explicitly:
 
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
-2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Plan is always posted publicly.
+2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
 3. **Phase 2 — Coder ↔ reviewer loop** per track. Up to 2 sonnet rounds. If still stuck *and* the failure mode is reasoning depth (not spec ambiguity), escalates to the opus elite pair for up to 2 more rounds. Hard cap of 4 total iterations per track.
-4. **Phase 3 — Security gate.** One pass of `security-review` across all changed files.
-5. **Phase 4 — QA handoff.** Ticket → `qa`, posts a QA testing checklist as a ticket comment.
-6. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
+4. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
+5. **Phase 3 — Security gate.** One pass of `security-review` across all changed files.
+6. **Phase 4 — QA handoff.** Ticket → `qa`, posts a QA testing checklist as a ticket comment.
+7. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
 
 ### Headless mode
 
@@ -74,6 +76,7 @@ You usually don't — odin handles routing. But for the rare case you want to ca
 | `@ux-design` | You want a design spec but no implementation yet. |
 | `@coder-web` / `@coder-flutter` | You want implementation only, bypassing planning (rare; usually a mistake). |
 | `@code-review` | Review pending changes without implementing fixes. |
+| `@data-architect` | One-off data-layer audit (schema, RLS, indexes, migrations) on the current branch. |
 | `@security-review` | One-off security audit of the current branch. |
 
 The two `*-elite` agents are reserved for odin to spawn during escalation — don't invoke them directly.

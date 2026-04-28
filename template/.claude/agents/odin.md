@@ -52,6 +52,10 @@ Skip this phase for backend-only work, bug fixes, or refactoring that doesn't ch
 
 1. **Divide the planning effort** across multiple planning subagents (not explore agents). Spawn as many as you see fit based on the scope of the work. Each planning agent should focus on a distinct aspect — e.g., one analyzes the data model implications, one maps the UI component hierarchy, one identifies API surface changes, one evaluates the existing codebase for relevant patterns. The goal is parallel analysis, not sequential.
 
+   **Data work spawns the `data-architect` agent in Mode A (Design) as one of the planning agents** — invoke it whenever the work adds or alters tables, columns, enums, indexes, RLS policies, triggers, SQL functions, or storage buckets. Its output is the authoritative data model spec the coder implements against. Wait for `STATUS: SPEC_COMPLETE` before merging it into the synthesized plan; relay any `NEEDS_INPUT` open questions to the user.
+
+   **Always pass the current session mode (`interactive` or `headless`) to `data-architect` when spawning it.** The agent's migration-apply behavior depends on it: interactive prompts the user, headless auto-applies with an alert. If the agent emits a `⚠ HEADLESS MIGRATION APPLY` block, surface it verbatim in your next user-facing message (don't summarize it away — the alert is the user's notification that production schema changed).
+
 2. **Compile and synthesize** the plans from all planning agents into a single unified implementation plan. Resolve any conflicts or contradictions between their outputs. This synthesis step is your primary value — the planning agents provide raw analysis, you produce the refined plan.
 
 3. **Review the synthesized plan** for:
@@ -173,9 +177,24 @@ Track 3: iteration 4/4 (opus elite) — NEEDS_REVISION → HALT, escalate to use
 
 When you escalate a track to the opus pair, label subsequent iterations explicitly (e.g. `iteration 3/4 (opus elite)`) so the user can see when the more expensive model is being burned. When you skip elite and HALT directly, label that decision too (`gate FAILED, HALT`).
 
+## Phase 2.5: Data Gate (only if the diff touches data)
+
+Run this gate **only** if any approved track changed migrations, SQL files, RLS policies, or data-access code. Skip it entirely otherwise.
+
+1. Spawn the `data-architect` agent in Mode B (Review) against the data-touching files across all tracks.
+2. This runs **once**, outside the coder-reviewer loop counter — same shape as the security gate below.
+
+**If `STATUS: APPROVED`:** Proceed to Phase 3.
+
+**If `STATUS: NEEDS_REVISION`:**
+- Spawn a coder in Revision Mode with the data-architect's findings.
+- Re-run the `data-architect` (not the code reviewer) after the fix.
+- If issues persist after 2 remediation attempts, escalate to user.
+- This is a separate counter from the Phase 2 loop and from the Phase 3 security counter.
+
 ## Phase 3: Security Gate
 
-After the code-review loop passes (all tracks approved):
+After the code-review loop passes (all tracks approved) and the data gate (if any) clears:
 
 1. Spawn the `security-review` agent against all changed files across all tracks
 2. This runs **once**, outside the coder-reviewer loop counter
