@@ -42,13 +42,17 @@ main().catch((err) => {
 async function main() {
   console.log(`\ncu-odin: installing harness into ${targetDir}\n`);
 
-  // Three categories the user gets to decide on, plus ticket assets which
-  // copy-if-missing without prompting (versioned schema, no per-project edits).
+  // Categories the user gets to decide on, plus ticket assets which copy-if-missing
+  // without prompting (versioned schema, no per-project edits).
   const groups = {
-    harness: {
-      label: "agents + CLAUDE.md",
+    claudeMd: {
+      label: "CLAUDE.md",
+      files: collectFiles((rel) => rel === "CLAUDE.md"),
+    },
+    agents: {
+      label: ".claude/agents/",
       files: collectFiles((rel) =>
-        rel === "CLAUDE.md" || rel.startsWith(path.join(".claude", "agents") + path.sep)
+        rel.startsWith(path.join(".claude", "agents") + path.sep)
       ),
     },
     domain: {
@@ -75,7 +79,8 @@ async function main() {
   const overwritten = [];
   const skipped = [];
 
-  applyGroup(groups.harness, decisions.harness, created, overwritten, skipped);
+  applyGroup(groups.claudeMd, decisions.claudeMd, created, overwritten, skipped);
+  applyGroup(groups.agents, decisions.agents, created, overwritten, skipped);
   applyGroup(groups.domain, decisions.domain, created, overwritten, skipped);
   applyGroup(groups.designSystem, decisions.designSystem, created, overwritten, skipped);
   // Tickets are always copy-if-missing, never overwrite, never prompted.
@@ -106,12 +111,22 @@ function groupExists(group) {
 async function promptDecisions(groups) {
   const decisions = {};
 
-  const harnessExists = groupExists(groups.harness);
-  decisions.harness = await ask({
-    label: groups.harness.label,
-    exists: harnessExists,
-    questionExists: "Overwrite the existing agents and CLAUDE.md with the latest from this cu-odin release?",
-    questionMissing: "Install agents and CLAUDE.md?",
+  const claudeMdExists = groupExists(groups.claudeMd);
+  decisions.claudeMd = await ask({
+    label: groups.claudeMd.label,
+    exists: claudeMdExists,
+    questionExists: "Overwrite the existing CLAUDE.md with the latest from this cu-odin release?",
+    questionMissing: "Install CLAUDE.md?",
+    defaultIfExists: false,
+    defaultIfMissing: true,
+  });
+
+  const agentsExists = groupExists(groups.agents);
+  decisions.agents = await ask({
+    label: groups.agents.label,
+    exists: agentsExists,
+    questionExists: "Overwrite the existing agents with the latest from this cu-odin release?",
+    questionMissing: "Install agents?",
     defaultIfExists: false,
     defaultIfMissing: true,
   });

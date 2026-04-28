@@ -104,7 +104,7 @@ If a repo contains both, odin splits work into per-stack sub-tracks.
 
 ## Updating the harness in a project
 
-Re-run `npx -y github:mrsollis/cu-odin` to pull in fresh agent definitions. Answer `y` to the first prompt (overwrite agents + CLAUDE.md) and hit enter through the other two (defaults to "no" so your `domain.md` and `design-system/*` stay untouched).
+Re-run `npx -y github:mrsollis/cu-odin` to pull in fresh agent definitions. Answer `y` to the `CLAUDE.md` and agents prompts, and hit enter through the rest (defaults to "no" so your `domain.md` and `design-system/*` stay untouched).
 
 ## Contributing
 
