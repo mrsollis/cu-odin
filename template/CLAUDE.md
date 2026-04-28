@@ -38,10 +38,21 @@ If a repo contains both, the orchestrator splits work into per-stack sub-tracks.
 
 Tickets live in Supabase. Schema and conventions: [.claude/assets/ticket-system/](.claude/assets/ticket-system/).
 
-- `tickets` table — `id` (text, repo-prefixed e.g. `TUM-123`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `labels` (text[])
+- `tickets` table — `id` (text, repo-prefixed e.g. `TUM-123`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `branch_name`, `blocked_reason`, `labels` (text[])
 - `ticket_comments` table — append-only, used for QA checklists and the suggestions ledger
-- The orchestrator reads/writes via Supabase MCP tools
+- The orchestrator and dispatcher read/write via Supabase MCP tools
+- DB trigger validates `depends_on` (rejects unknown ids and self-references)
 - One ticket per repo serves as the **suggestions ledger** — the orchestrator appends MEDIUM/LOW review findings to it as comments. Seed it manually after applying the schema.
+
+**Per-repo config** (set below in this file):
+- Supabase project id: _set me_
+- Ticket id prefix: _set me, e.g._ `TUM-`
+- Suggestions ledger ticket id: _set me, e.g._ `TUM-26`
+
+### Working with tickets
+
+- [/add-ticket](.claude/skills/add-ticket/SKILL.md) — file a new ticket.
+- [/process-ticket](.claude/skills/process-ticket/SKILL.md) — claim and dispatch tickets to `@odin`. Supports `--loop`, `--orchestrate N` (worktree-based parallelism), filters (`--priority`, `--category`, `--tier`), and `--dry-run`. The dispatcher hands each claimed ticket to `@odin` for execution and stops at QA handoff. **Push and ticket completion are user-triggered Phase 5 only — never automatic, even in headless.**
 
 ## Agent harness
 
@@ -56,6 +67,13 @@ All agents live in `.claude/agents/`.
 | [code-review](.claude/agents/code-review.md) | After every coder pass. Runs quality gates + manual review. APPROVED or NEEDS_REVISION. |
 | [data-architect](.claude/agents/data-architect.md) | (1) During planning whenever the work touches schemas, RLS, indexes, migrations, or storage — produces the data model spec. (2) Once after the coder-reviewer loop converges, only if the diff touches data — audits migrations, RLS, indexes, and data security. |
 | [security-review](.claude/agents/security-review.md) | Once per feature, after the coder-reviewer loop and data gate converge. |
+
+**Skills:**
+
+| Skill | When to invoke |
+|-------|----------------|
+| [/add-ticket](.claude/skills/add-ticket/SKILL.md) | File a new ticket. |
+| [/process-ticket](.claude/skills/process-ticket/SKILL.md) | Claim & dispatch tickets to `@odin`. Supports queue-runner (`--loop`), worktree parallelism (`--orchestrate N`), filters, dry-run. |
 
 **Workflow** (full detail in [odin.md](.claude/agents/odin.md)):
 
@@ -78,4 +96,4 @@ CLAUDE.md
 .claude/rules/domain.md         # file exists — replace contents
 ```
 
-Then write the project-specific [.claude/rules/domain.md](.claude/rules/domain.md) and fill in [.claude/rules/design-system/](.claude/rules/design-system/). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) to the project's Supabase and seed the suggestions ledger ticket. Nothing else to configure.
+Then write the project-specific [.claude/rules/domain.md](.claude/rules/domain.md) and fill in [.claude/rules/design-system/](.claude/rules/design-system/). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) to the project's Supabase, seed the suggestions ledger ticket, and fill in the per-repo config above (Supabase project id, ticket id prefix, suggestions ledger ticket id). Nothing else to configure.
