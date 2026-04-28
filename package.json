@@ -1,0 +1,31 @@
+{
+  "name": "cu-odin",
+  "version": "0.1.0",
+  "description": "Drop-in Claude Code agent harness: an opus-led orchestrator (odin) coordinating coder, code-review, security-review, and ux-design subagents, with stack detection for Node/Next.js and Flutter.",
+  "bin": {
+    "cu-odin": "bin/cu-odin.js"
+  },
+  "files": [
+    "bin",
+    "template",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16.7.0"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agents",
+    "ai",
+    "orchestrator",
+    "harness"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrsollis/cu-odin.git"
+  },
+  "homepage": "https://github.com/mrsollis/cu-odin#readme"
+}
