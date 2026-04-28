@@ -3,10 +3,10 @@
 Drop-in Claude Code agent harness. One command installs an opus-led orchestrator (`odin`) and a roster of specialized subagents into any repo.
 
 ```sh
-npx cu-odin
+npx @mrsollis/cu-odin
 ```
 
-That's it. Then edit `.claude/rules/domain.md` and `.claude/rules/design-system/*` for your project, and you're running.
+That's it. The installer asks three quick questions (stub in domain? stub in design-system? overwrite agents?), then drops the harness into your repo. Edit `.claude/rules/domain.md` and `.claude/rules/design-system/*` for your project, and you're running.
 
 ## What you get
 
@@ -95,7 +95,7 @@ If a repo contains both, odin splits work into per-stack sub-tracks.
 
 ## Updating the harness in a project
 
-Re-run `npx cu-odin` to pull in fresh agent definitions. Existing files are skipped by default; pass `--force` to overwrite. Your `domain.md` and `design-system/*` are project-specific so by convention they should not change between releases — if they do, the changelog will call it out.
+Re-run `npx @mrsollis/cu-odin` to pull in fresh agent definitions. Answer `y` to the first prompt (overwrite agents + CLAUDE.md) and hit enter through the other two (defaults to "no" so your `domain.md` and `design-system/*` stay untouched).
 
 ## Contributing
 
