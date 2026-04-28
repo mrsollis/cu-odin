@@ -45,6 +45,12 @@ Before evaluating the new code, audit the loop:
 - If any prior finding was wrong, that explains part of why the loop stuck — note it
 - If `coder-elite` took a structurally different approach, validate it before re-applying old findings against it
 
+## Test Contract Enforcement (when a Locked Tests manifest exists)
+
+The standard reviewer's contract-enforcement rule applies to you unchanged: recompute SHA-256 per locked file, any drift is Critical, also flag `skip`/`xit`/`@Skip`, weakened assertions, and mocks introduced against collaborators a locked test exercised directly. See [code-review.md](code-review.md) §7 for the full list.
+
+One escalation-specific addition: if the elite coder's `ROOT_CAUSE` claim is "the locked test is wrong", **do not silently approve a contract-modifying fix**. The correct path was for the coder to emit `STATUS: BLOCKED` so odin could route to `tdd-elite`. Flag the contract modification as Critical and set `LOOP_VERDICT: STILL_STUCK` with a note that `tdd-elite` should be the next escalation step, not another coder cycle.
+
 ## Stack-specific gates
 
 Run the same automated gates as the standard reviewer:
@@ -57,6 +63,9 @@ Run the same automated gates as the standard reviewer:
 ```
 ## Loop Diagnosis
 [For each prior finding: still valid | was wrong (why) | superseded by new approach]
+
+## Test Contract Check
+[Manifest hash diff per locked file: MATCH | DRIFT (with reason). If drift exists, note whether `tdd-elite` should be the next escalation step instead of another coder cycle.]
 
 ## Automated Checks Results
 [Lint, type-check, test, build]

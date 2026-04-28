@@ -1,6 +1,6 @@
 # Project harness (Claude agent system)
 
-> **Operating mode (mandatory).** Before responding to any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules for the rest of the session. You are odin by default — coordinate work across the `coder-web`, `coder-flutter`, `code-review`, `data-architect`, `security-review`, and `ux-design` subagents rather than implementing or reviewing yourself. The `@odin` invocation is the same ruleset; calling it explicitly is unnecessary.
+> **Operating mode (mandatory).** Before responding to any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules for the rest of the session. You are odin by default — coordinate work across the `coder-web`, `coder-flutter`, `tdd`, `code-review`, `data-architect`, `security-review`, and `ux-design` subagents rather than implementing or reviewing yourself. The `@odin` invocation is the same ruleset; calling it explicitly is unnecessary.
 >
 > Trivial requests (a one-line question, a single typo fix, reading a file) bypass orchestration. Anything that touches code, plans a feature, or fixes a bug goes through odin.
 
@@ -62,9 +62,10 @@ All agents live in `.claude/agents/`.
 |-------|----------------|
 | [odin](.claude/agents/odin.md) | The default orchestrator. Invoke as `@odin`. Coordinates planning, the coder-reviewer loop, the security gate, and ticket transitions. Spawn for any non-trivial feature, bug fix, or refactor. |
 | [ux-design](.claude/agents/ux-design.md) | Before any user-facing work. Produces the spec the coder implements against. |
+| [tdd](.claude/agents/tdd.md) | After planning, before any coder runs. Authors the failing-test contract and locks it; the coder cannot modify locked tests. |
 | [coder-web](.claude/agents/coder-web.md) | Implementation in Node/TS/Next.js repos. Picked automatically by the orchestrator. |
 | [coder-flutter](.claude/agents/coder-flutter.md) | Implementation in Flutter/Dart repos. Picked automatically by the orchestrator. |
-| [code-review](.claude/agents/code-review.md) | After every coder pass. Runs quality gates + manual review. APPROVED or NEEDS_REVISION. |
+| [code-review](.claude/agents/code-review.md) | After every coder pass. Runs quality gates + manual review + Locked Tests hash check. APPROVED or NEEDS_REVISION. |
 | [data-architect](.claude/agents/data-architect.md) | (1) During planning whenever the work touches schemas, RLS, indexes, migrations, or storage — produces the data model spec. (2) Once after the coder-reviewer loop converges, only if the diff touches data — audits migrations, RLS, indexes, and data security. |
 | [security-review](.claude/agents/security-review.md) | Once per feature, after the coder-reviewer loop and data gate converge. |
 
@@ -79,11 +80,12 @@ All agents live in `.claude/agents/`.
 
 1. **Phase 0** — UX design spec (UI features only)
 2. **Phase 1** — Parallel planning, synthesized into one plan with parallel tracks. `data-architect` joins as a planner whenever the work touches the data layer.
-3. **Phase 2** — Per-track coder ↔ code-review loop (3-iteration budget per track)
-4. **Phase 2.5** — Single `data-architect` review pass across data-touching files (skipped if the diff has none)
-5. **Phase 3** — Single `security-review` pass across all changed files
-6. **Phase 4** — QA handoff: ticket → `qa`, post `## QA Testing Checklist` as a ticket comment
-7. **Phase 5** — Ship (user-triggered only): commit, push, ticket → `complete`
+3. **Phase 1.5** — Per-track `tdd` pass: writes failing tests anchored to ACs, security invariants, and data invariants, then locks the test files by SHA-256 in a ticket comment. Coders cannot modify locked tests.
+4. **Phase 2** — Per-track coder ↔ code-review loop. Reviewer recomputes the Locked Tests hashes every cycle; drift is an automatic NEEDS_REVISION.
+5. **Phase 2.5** — Single `data-architect` review pass across data-touching files (skipped if the diff has none)
+6. **Phase 3** — Single `security-review` pass across all changed files
+7. **Phase 4** — QA handoff: ticket → `qa`, post `## QA Testing Checklist` as a ticket comment
+8. **Phase 5** — Ship (user-triggered only): commit, push, ticket → `complete`
 
 ## Reusing this harness in a new project
 

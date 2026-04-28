@@ -20,6 +20,8 @@ CLAUDE.md
 │   ├── coder-elite.md           # opus escalation coder (gated)
 │   ├── code-review.md           # standard reviewer (sonnet)
 │   ├── code-review-elite.md     # opus escalation reviewer (gated)
+│   ├── tdd.md                   # test custodian — writes & locks the test contract (sonnet)
+│   ├── tdd-elite.md             # opus escalation custodian (gated)
 │   ├── data-architect.md        # Supabase schema / RLS / data security (sonnet)
 │   ├── security-review.md       # OWASP-focused review (sonnet)
 │   └── ux-design.md             # design spec producer (sonnet)
@@ -38,11 +40,12 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
-3. **Phase 2 — Coder ↔ reviewer loop** per track. Up to 2 sonnet rounds. If still stuck *and* the failure mode is reasoning depth (not spec ambiguity), escalates to the opus elite pair for up to 2 more rounds. Hard cap of 4 total iterations per track.
-4. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
-5. **Phase 3 — Security gate.** One pass of `security-review` across all changed files.
-6. **Phase 4 — QA handoff.** Ticket → `qa`, posts a QA testing checklist as a ticket comment.
-7. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
+3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 in a ticket comment. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
+4. **Phase 2 — Coder ↔ reviewer loop** per track. Up to 2 sonnet rounds. If still stuck *and* the failure mode is reasoning depth (not spec ambiguity), escalates to the opus elite pair for up to 2 more rounds. Hard cap of 4 total iterations per track. If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
+5. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
+6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files.
+7. **Phase 4 — QA handoff.** Ticket → `qa`, posts a QA testing checklist as a ticket comment.
+8. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
 
 ### Headless mode
 
@@ -74,12 +77,13 @@ You usually don't — odin handles routing. But for the rare case you want to ca
 |-------|---------------------|
 | `@odin` | Same as the default, but explicit. Useful if you've drifted out of orchestrator behavior. |
 | `@ux-design` | You want a design spec but no implementation yet. |
+| `@tdd` | You want a failing-test contract for the current branch without an implementation. Locks the tests so a later coder can't quietly weaken them. |
 | `@coder-web` / `@coder-flutter` | You want implementation only, bypassing planning (rare; usually a mistake). |
-| `@code-review` | Review pending changes without implementing fixes. |
+| `@code-review` | Review pending changes without implementing fixes. Includes Locked Tests hash check if a manifest exists. |
 | `@data-architect` | One-off data-layer audit (schema, RLS, indexes, migrations) on the current branch. |
 | `@security-review` | One-off security audit of the current branch. |
 
-The two `*-elite` agents are reserved for odin to spawn during escalation — don't invoke them directly.
+The three `*-elite` agents (`coder-elite`, `code-review-elite`, `tdd-elite`) are reserved for odin to spawn during escalation — don't invoke them directly.
 
 ## Stack detection
 

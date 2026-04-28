@@ -83,6 +83,14 @@ Before writing ANY code on an initial implementation, you MUST:
 - Organize imports according to project conventions
 - Follow the project's file and folder naming patterns
 
+### Locked Tests (the test contract)
+
+If a `## Locked Tests` manifest exists on the ticket (posted by the `tdd` agent in Phase 1.5), you must not modify any file listed in it. Treat the listed tests as a frozen contract that defines the work — your job is to make them pass without altering them. Specifically: do not disable, skip, `xit`/`it.skip`, comment-out, weaken assertions in, replace `toEqual` with `toBeDefined`, introduce mocks for collaborators a locked test exercised directly, or delete locked tests under any circumstances.
+
+If a locked test is genuinely wrong (asserts something the spec doesn't require, or has a real bug — not just inconvenient), stop work and post a ticket comment requesting `tdd` re-evaluation with the specific reason. Only the `tdd` agent may modify the contract.
+
+You may freely add **new** test files for unit-level coverage of internal helpers — those are not part of the contract and are not subject to the lock.
+
 ### Phase 3: Verification
 
 Run the project's quality gates. Detect the package manager from the lockfile (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` → bun, otherwise npm) and run the scripts defined in `package.json`. The conventional set:

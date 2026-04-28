@@ -99,6 +99,22 @@ Always post the plan summary below — in both modes. In **interactive mode**, s
 ### Ticket: [tickets.id reference if applicable, e.g. TUM-123]
 ```
 
+## Phase 1.5: Test Contract
+
+After the plan is posted (and approved, in interactive mode), spawn the `tdd` agent **per track in parallel** before any coder runs. The tdd agent authors **failing** tests anchored to:
+
+- every numbered acceptance criterion in the plan
+- security invariants from [security-review.md](security-review.md) (authz, input validation, injection class, secret leakage)
+- data invariants from [data-architect.md](data-architect.md) (RLS, constraints, migration reversibility) — only when the track touches data
+
+Each tdd agent posts a `## Locked Tests` manifest to the ticket: file paths plus SHA-256 of each file's contents, plus the AC/SEC/DATA item each test covers. Phase 2 cannot start for a track until that track has `STATUS: TESTS_LOCKED`.
+
+**If a track returns `STATUS: NEEDS_SPEC_CLARIFICATION`:** loop back to planning **for that track only**. Other tracks proceed. Relay the unverifiable ACs to the user and gather the missing spec, then re-spawn `tdd` for that track.
+
+**Skip Phase 1.5 only when** the track has no executable code (pure docs, pure config, pure asset moves). State the skip and reason explicitly in the user-facing plan post; never skip silently.
+
+The Locked Tests manifest is the contract the rest of the pipeline enforces. The coder is not allowed to modify any file listed in it; the reviewer recomputes its hashes.
+
 ## Phase 2: Coder-Reviewer Loop
 
 For each track, execute this loop:
@@ -121,11 +137,13 @@ If a track touches both stacks (e.g. a backend API change paired with a Flutter 
 - Coder must pass its stack's **automated checks gate** before handing off (defined in the coder agent's Phase 3 — e.g. `pnpm lint` / `pnpm type-check` / `pnpm test` / `pnpm build` for web; `dart format` / `flutter analyze` / `flutter test` for Flutter).
 - If automated checks fail, the coder fixes them before emitting `STATUS: COMPLETE`. Do not spawn a reviewer until automated checks pass.
 - If the coder emits `STATUS: BLOCKED`, escalate to the user immediately. Do not count this as a loop iteration.
+- **Locked Tests are off-limits to the coder.** Pass the Phase 1.5 Locked Tests manifest in the coder's prompt. Coders MUST NOT modify any file listed there. If the coder believes a locked test is wrong, it must stop and request `tdd` re-evaluation via a ticket comment — never edit the test directly. A coder that modifies a locked test is producing a NEEDS_REVISION outcome regardless of whether tests pass.
 
 ### Step 2: Spawn Code Reviewer
 
 - Reviewer runs automated checks independently (trust but verify)
 - Reviewer evaluates ONLY the files changed by the coder. Do not expand review scope to untouched files.
+- **Reviewer enforces the Locked Tests manifest.** Pass the manifest in the reviewer's prompt. The reviewer recomputes SHA-256 of every listed file; any drift is an automatic Critical issue with reason "test contract modified by coder" and STATUS: NEEDS_REVISION, even if all tests pass.
 - On revision cycles (iteration 2+), reviewer focuses on:
   - Whether the specific prior findings were addressed
   - Whether the fixes introduced new issues (these count as new findings and loop normally)
@@ -160,6 +178,16 @@ Before spawning the elite pair, you must answer **yes** to all three:
 3. **Has the loop made any progress?** If iteration 2 fixed nothing from iteration 1's findings, or the same exact issues are recurring verbatim, the loop is fundamentally stuck — not slowed down. Opus is unlikely to unstick a zero-progress loop. HALT.
 
 If any answer is **no**, HALT after iteration 2 and escalate to user with your assessment of *why* opus would not help. Do not default to escalation. The user can usually unstick the loop in one message (clarifying intent, fixing the spec, marking a finding wrong) far cheaper than two opus rounds.
+
+#### Contract-First Check (run before spawning the elite pair)
+
+Before burning opus on `coder-elite` + `code-review-elite`, ask: **is the failure in the implementation, or in the test contract itself?** Indicators that the contract is the problem:
+
+- The coder repeatedly fixes the implementation and the same locked test still fails — and on inspection, the test seems to assert the wrong thing or mock too much
+- The reviewer keeps citing a locked test as the source of truth but the elite gate's "are the recurring findings actually correct?" check is leaning toward no
+- The coder posted a comment requesting tdd re-evaluation and you ignored it
+
+If contract-first, spawn `tdd-elite` **before** `coder-elite`. The new contract counts as part of the same elite round, not a fresh budget. After `tdd-elite` posts an updated manifest with `LOOP_VERDICT: CONTRACT_FIXED`, re-enter the standard coder/reviewer loop for the remaining iterations against the new contract. If `tdd-elite` returns `LOOP_VERDICT: RESTART_REQUIRED`, HALT to user — the spec itself is the blocker.
 
 When you HALT without escalating to elite, say so explicitly in the user-facing message: "Halting after 2 sonnet rounds; escalation to elite would not help because [reason]."
 
