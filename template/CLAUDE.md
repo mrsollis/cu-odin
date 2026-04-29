@@ -38,11 +38,11 @@ If a repo contains both, the orchestrator splits work into per-stack sub-tracks.
 
 Tickets live in Supabase. Schema and conventions: [.claude/assets/ticket-system/](.claude/assets/ticket-system/).
 
-- `tickets` table — `id` (text, auto-assigned `T-1`, `T-2`, … via `next_ticket_id()`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `branch_name`, `blocked_reason`, `labels` (text[]), `metadata` (jsonb — project extension slot)
-- `ticket_comments` table — append-only, used for QA checklists and the suggestions ledger
-- The orchestrator and dispatcher read/write via Supabase MCP tools
+- `tickets` table — `id` (text, auto-assigned `T-1`, `T-2`, … via `next_ticket_id()`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `branch_name`, `blocked_reason`, `labels` (text[]), `metadata` (jsonb)
+- `metadata` is the single jsonb slot that carries everything beyond the structured columns: orchestrator-reserved keys (`locked_tests`, `qa`, `outcome`, `telemetry`, `cancellation`, `comments`) and any project-specific keys alongside. There is **no** `ticket_comments` table — this system is headless-first, so all per-ticket history lives in `metadata`.
+- The orchestrator and dispatcher read/write via Supabase MCP tools, always merging into `metadata` with `||` / `jsonb_set` so reserved-key updates never clobber project keys.
 - DB trigger validates `depends_on` (rejects unknown ids and self-references)
-- The fixed id `T-0` is the **suggestions ledger** — the orchestrator appends MEDIUM/LOW review findings to it as `ticket_comments`. Seed it once after applying the schema.
+- Non-blocking review findings (MEDIUM/LOW) are surfaced to the user at Phase 4 QA handoff with a prompt to file each as a ticket or drop it — there is no persistent suggestions ledger.
 
 ### Working with tickets
 
@@ -75,11 +75,11 @@ All agents live in `.claude/agents/`.
 
 1. **Phase 0** — UX design spec (UI features only)
 2. **Phase 1** — Parallel planning, synthesized into one plan with parallel tracks. `data-architect` joins as a planner whenever the work touches the data layer.
-3. **Phase 1.5** — Per-track `tdd` pass: writes failing tests anchored to ACs, security invariants, and data invariants, then locks the test files by SHA-256 in a ticket comment. Coders cannot modify locked tests.
+3. **Phase 1.5** — Per-track `tdd` pass: writes failing tests anchored to ACs, security invariants, and data invariants, then locks the test files by SHA-256 into `metadata.locked_tests`. Coders cannot modify locked tests.
 4. **Phase 2** — Per-track coder ↔ code-review loop. Reviewer recomputes the Locked Tests hashes every cycle; drift is an automatic NEEDS_REVISION.
 5. **Phase 2.5** — Single `data-architect` review pass across data-touching files (skipped if the diff has none)
 6. **Phase 3** — Single `security-review` pass across all changed files
-7. **Phase 4** — QA handoff: ticket → `qa`, post `## QA Testing Checklist` as a ticket comment
+7. **Phase 4** — QA handoff: ticket → `qa`, write `## QA Testing Checklist` markdown into `metadata.qa.checklist`
 8. **Phase 5** — Ship (user-triggered only): commit, push, ticket → `complete`
 
 ## Reusing this harness in a new project
@@ -93,4 +93,4 @@ CLAUDE.md
 .claude/rules/domain.md         # file exists — replace contents
 ```
 
-Then write the project-specific [.claude/rules/domain.md](.claude/rules/domain.md) and fill in [.claude/rules/design-system/](.claude/rules/design-system/). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) to the project's Supabase and seed `T-0` (suggestions ledger). Nothing else to configure — the Supabase project id lives in the Supabase MCP server config.
+Then write the project-specific [.claude/rules/domain.md](.claude/rules/domain.md) and fill in [.claude/rules/design-system/](.claude/rules/design-system/). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) to the project's Supabase. Nothing else to configure — the Supabase project id lives in the Supabase MCP server config.

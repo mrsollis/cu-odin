@@ -107,7 +107,19 @@ After the plan is posted (and approved, in interactive mode), spawn the `tdd` ag
 - security invariants from [security-review.md](security-review.md) (authz, input validation, injection class, secret leakage)
 - data invariants from [data-architect.md](data-architect.md) (RLS, constraints, migration reversibility) — only when the track touches data
 
-Each tdd agent posts a `## Locked Tests` manifest to the ticket: file paths plus SHA-256 of each file's contents, plus the AC/SEC/DATA item each test covers. Phase 2 cannot start for a track until that track has `STATUS: TESTS_LOCKED`.
+Each tdd agent writes a Locked Tests manifest into `tickets.metadata.locked_tests`: file paths plus SHA-256 of each file's contents, plus the AC/SEC/DATA item each test covers. Use `metadata = metadata || jsonb_build_object('locked_tests', <manifest>)` so project keys are preserved. Shape:
+
+```json
+{
+  "locked_tests": {
+    "locked_at": "2026-04-29T18:22:01Z",
+    "files": [{ "path": "tests/foo.test.ts", "sha256": "..." }],
+    "coverage": [{ "item": "AC-1", "file": "tests/foo.test.ts" }]
+  }
+}
+```
+
+Phase 2 cannot start for a track until that track has `STATUS: TESTS_LOCKED`.
 
 **If a track returns `STATUS: NEEDS_SPEC_CLARIFICATION`:** loop back to planning **for that track only**. Other tracks proceed. Relay the unverifiable ACs to the user and gather the missing spec, then re-spawn `tdd` for that track.
 
@@ -137,7 +149,7 @@ If a track touches both stacks (e.g. a backend API change paired with a Flutter 
 - Coder must pass its stack's **automated checks gate** before handing off (defined in the coder agent's Phase 3 — e.g. `pnpm lint` / `pnpm type-check` / `pnpm test` / `pnpm build` for web; `dart format` / `flutter analyze` / `flutter test` for Flutter).
 - If automated checks fail, the coder fixes them before emitting `STATUS: COMPLETE`. Do not spawn a reviewer until automated checks pass.
 - If the coder emits `STATUS: BLOCKED`, escalate to the user immediately. Do not count this as a loop iteration.
-- **Locked Tests are off-limits to the coder.** Pass the Phase 1.5 Locked Tests manifest in the coder's prompt. Coders MUST NOT modify any file listed there. If the coder believes a locked test is wrong, it must stop and request `tdd` re-evaluation via a ticket comment — never edit the test directly. A coder that modifies a locked test is producing a NEEDS_REVISION outcome regardless of whether tests pass.
+- **Locked Tests are off-limits to the coder.** Pass the Phase 1.5 Locked Tests manifest in the coder's prompt. Coders MUST NOT modify any file listed there. If the coder believes a locked test is wrong, it must stop and emit `STATUS: BLOCKED` with `reason: locked_test_disputed` and the path/assertion in question — never edit the test directly. A coder that modifies a locked test is producing a NEEDS_REVISION outcome regardless of whether tests pass.
 
 ### Step 2: Spawn Code Reviewer
 
@@ -185,7 +197,7 @@ Before burning opus on `coder-elite` + `code-review-elite`, ask: **is the failur
 
 - The coder repeatedly fixes the implementation and the same locked test still fails — and on inspection, the test seems to assert the wrong thing or mock too much
 - The reviewer keeps citing a locked test as the source of truth but the elite gate's "are the recurring findings actually correct?" check is leaning toward no
-- The coder posted a comment requesting tdd re-evaluation and you ignored it
+- The coder emitted `STATUS: BLOCKED` with `reason: locked_test_disputed` and you ignored it
 
 If contract-first, spawn `tdd-elite` **before** `coder-elite`. The new contract counts as part of the same elite round, not a fresh budget. After `tdd-elite` posts an updated manifest with `LOOP_VERDICT: CONTRACT_FIXED`, re-enter the standard coder/reviewer loop for the remaining iterations against the new contract. If `tdd-elite` returns `LOOP_VERDICT: RESTART_REQUIRED`, HALT to user — the spec itself is the blocker.
 
@@ -270,18 +282,46 @@ After all reviews pass, do these steps **in order** — do not wait for the user
 [One sentence: what the user should test manually]
 ```
 
-### Step 2: Add non-blocking suggestions to the accumulated suggestions ticket
+### Step 2: Surface non-blocking suggestions to the user
 
-Append accumulated MEDIUM/LOW findings to the suggestions ledger (`tickets.id = 'T-0'`) by inserting a row into `ticket_comments` (one comment per execution; do not edit the ticket description). Never discard these — they are the project's technical debt ledger.
+Present any accumulated MEDIUM/LOW findings to the user and ask whether to file them as tickets or drop them. If there are zero findings, skip this step entirely.
 
-Use the Supabase MCP tools (`mcp__claude_ai_Supabase__execute_sql`) for all ticket reads/writes. Schema and conventions live in [.claude/assets/ticket-system/](../assets/ticket-system/) — see that README for the canonical column shape and status transitions.
+Format:
 
-### Step 3: Update the ticket and post QA checklist
+```
+## Non-Blocking Suggestions ([N] item[s])
 
-1. **Transition ticket** to `status = 'qa'`. Remove `Exec: Active` from `labels`, add `QA: Testing`. Leave `assigned_to`, `assigned_at`, `branch_name`, and `blocked_reason` (if any) intact — they're cleared at ship.
-2. **Post a QA testing checklist** as a row in `ticket_comments` (not in `tickets.description`). Format the `body` as `## QA Testing Checklist` with `- [ ]` checkboxes organized by feature area. Derive test cases from the plan's Verification section + any edge cases surfaced during review.
+1. [MEDIUM] <file:line> — <one-line description>
+2. [LOW]    <file:line> — <one-line description>
+…
 
-This step is mandatory and automatic — do not wait for the user to ask for it.
+Reply with the items to file as tickets (e.g. "1, 3" or "all"), or "skip" to drop them.
+```
+
+This applies in **both interactive and headless mode** — one prompt per ticket, posted at QA handoff, before step 3. It's the only user interaction Phase 4 requires.
+
+For each item the user elects to file, call the [/add-ticket](../skills/add-ticket/SKILL.md) skill with `category=chore`, `priority=low` (or `medium` if the original finding was MEDIUM), and a description that includes the file, line, and originating ticket id. Items the user skips are dropped — there is no persistent ledger.
+
+Use the Supabase MCP tools (`mcp__claude_ai_Supabase__execute_sql`) for all ticket reads/writes. Schema and conventions live in [.claude/assets/ticket-system/](../assets/ticket-system/) — see that README for the metadata namespace and status transitions.
+
+### Step 3: Update the ticket and write the QA checklist
+
+Single UPDATE: transition `status = 'qa'`, swap `Exec: Active` for `QA: Testing` in `labels`, and merge the QA checklist into `metadata.qa`. Leave `assigned_to`, `assigned_at`, `branch_name`, and `blocked_reason` (if any) intact — they're cleared at ship.
+
+```sql
+UPDATE public.tickets
+SET status = 'qa',
+    labels = array_append(array_remove(labels, 'Exec: Active'), 'QA: Testing'),
+    metadata = metadata || jsonb_build_object(
+      'qa', jsonb_build_object(
+        'checklist', '<markdown body>',
+        'posted_at', to_jsonb(now())
+      )
+    )
+WHERE id = '<this-ticket-id>';
+```
+
+The checklist markdown should start with `## QA Testing Checklist` and use `- [ ]` boxes organized by feature area, derived from the plan's Verification section + any edge cases surfaced during review. Never written into `tickets.description`. This step is mandatory and automatic — do not wait for the user to ask for it.
 
 ## Phase 5: Ship (user-triggered only)
 
@@ -293,8 +333,84 @@ When triggered:
 
 1. **Commit**: Stage all changed files and create a commit with a clear, conventional commit message summarizing the work. Present the commit message to the user before executing.
 2. **Push**: Push to the current branch. This will trigger an approval prompt (git push is in the `ask` permission list) — wait for user confirmation.
-3. **Update the ticket**: Set `status = 'complete'`, `completed_at = now()`. Clear `assigned_to`, `assigned_at`, `branch_name`, and `blocked_reason`. Remove any remaining in-progress labels (`QA: Testing`, `Exec: Active`) from `labels`. Report any downstream tickets (those with this id in `depends_on`) that are now ready.
-4. **Confirm**:
+3. **Capture run telemetry**: Before mutating the ticket, gather the data the next two steps need.
+   - **Run-state telemetry** (you already track this in-memory across the session):
+     - Per-track iteration counts split by tier: `sonnet_iterations`, `elite_iterations`.
+     - `elite_gate`: `not_triggered` | `passed` | `failed_halted` (with reason if halted).
+     - `tdd_elite_invoked`: boolean — was the contract-first path taken?
+     - `data_gate`: `skipped` | `approved` | `remediated_N` (N = remediation rounds).
+     - `security_gate`: `secure` | `remediated_N`.
+     - `blocked_events`: list of `{when, reason}` if `STATUS: BLOCKED` ever fired.
+     - `mode`: `interactive` | `headless`.
+   - **Diff telemetry** (one shell call, capture stdout):
+     - `git diff --shortstat main...HEAD` → `files_changed`, `insertions`, `deletions`.
+     - `git diff --name-only main...HEAD` → `files` (array, capped at 50; if more, store the count and the first 50).
+     - `git rev-parse --short HEAD` → `commit_sha` (post-commit value from step 1).
+     - `git log -1 --pretty=%s` → `commit_subject`.
+   - **Timing**: `assigned_at` (read from the ticket row before update), `completed_at = now()`, `duration_seconds` derived.
+4. **Compose the outcome note.** A short markdown string saved to `metadata.outcome` — the friendly "what changed" record for future humans (and future Claude sessions) browsing this ticket. Format:
+
+   ```
+   ## What Changed
+
+   <2–4 sentence plain-English summary: what the user can now do that they couldn't before, framed from the user's perspective — not the implementation. Reference the design spec or ticket goals where helpful.>
+
+   ### Highlights
+   - <bullet 1: a notable behavior, file area, or capability>
+   - <bullet 2: …>
+   - <bullet 3: …>
+   ```
+
+   Keep it honest and concrete — no marketing voice.
+
+5. **Update the ticket** in a single UPDATE: set `status = 'complete'`, `completed_at = now()`, `pr_url` if known. Clear `assigned_to`, `assigned_at`, `branch_name`, and `blocked_reason`. Remove any remaining in-progress labels (`QA: Testing`, `Exec: Active`) from `labels`. **Merge** both `outcome` (markdown string) and `telemetry` (run-telemetry block) into `metadata` via `||` so existing keys (project keys, `qa`, `locked_tests`) are preserved:
+
+   ```sql
+   UPDATE public.tickets
+   SET status = 'complete',
+       completed_at = now(),
+       pr_url = COALESCE(<pr_url>, pr_url),
+       assigned_to = NULL,
+       assigned_at = NULL,
+       branch_name = NULL,
+       blocked_reason = NULL,
+       labels = array_remove(array_remove(labels, 'QA: Testing'), 'Exec: Active'),
+       metadata = metadata || jsonb_build_object(
+         'outcome', '<markdown body from step 4>',
+         'telemetry', '<telemetry jsonb from step 3>'::jsonb
+       )
+   WHERE id = '<this-ticket-id>';
+   ```
+
+   Telemetry shape:
+
+   ```json
+   {
+     "telemetry": {
+       "completed_at": "2026-04-29T18:22:01Z",
+       "duration_seconds": 5421,
+       "mode": "interactive",
+       "commit_sha": "a1b2c3d",
+       "commit_subject": "T-42: add invoice export",
+       "branch": "ticket/t-42",
+       "diff": { "files_changed": 7, "insertions": 312, "deletions": 48, "files": ["..."] },
+       "tracks": [
+         { "name": "Track 1: API", "sonnet_iterations": 1, "elite_iterations": 0 },
+         { "name": "Track 2: UI",  "sonnet_iterations": 2, "elite_iterations": 1 }
+       ],
+       "gates": {
+         "elite_gate": "passed",
+         "tdd_elite_invoked": false,
+         "data_gate": "skipped",
+         "security_gate": "secure"
+       },
+       "blocked_events": []
+     }
+   }
+   ```
+
+6. Report any downstream tickets (those with this id in `depends_on`) that are now ready.
+7. **Confirm**:
 
 ```
 ## Shipped: [T-N] [Title]

@@ -85,9 +85,9 @@ Before writing ANY code on an initial implementation, you MUST:
 
 ### Locked Tests (the test contract)
 
-If a `## Locked Tests` manifest exists on the ticket (posted by the `tdd` agent in Phase 1.5), you must not modify any file listed in it. Treat the listed tests as a frozen contract that defines the work — your job is to make them pass without altering them. Specifically: do not disable, skip, `xit`/`it.skip`, comment-out, weaken assertions in, replace `toEqual` with `toBeDefined`, introduce mocks for collaborators a locked test exercised directly, or delete locked tests under any circumstances.
+If a Locked Tests manifest exists at `tickets.metadata.locked_tests` (written by the `tdd` agent in Phase 1.5), you must not modify any file listed under `files[].path`. Treat the listed tests as a frozen contract that defines the work — your job is to make them pass without altering them. Specifically: do not disable, skip, `xit`/`it.skip`, comment-out, weaken assertions in, replace `toEqual` with `toBeDefined`, introduce mocks for collaborators a locked test exercised directly, or delete locked tests under any circumstances.
 
-If a locked test is genuinely wrong (asserts something the spec doesn't require, or has a real bug — not just inconvenient), stop work and post a ticket comment requesting `tdd` re-evaluation with the specific reason. Only the `tdd` agent may modify the contract.
+If a locked test is genuinely wrong (asserts something the spec doesn't require, or has a real bug — not just inconvenient), stop work and emit `STATUS: BLOCKED` with `reason: locked_test_disputed`, naming the file and assertion in question. odin will route to `tdd` (or `tdd-elite`) for re-evaluation. Only the `tdd` agent may modify the contract.
 
 You may freely add **new** test files for unit-level coverage of internal helpers — those are not part of the contract and are not subject to the lock.
 

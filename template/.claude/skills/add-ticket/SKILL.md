@@ -56,7 +56,7 @@ RETURNING id;
 
 | Column | Type | Notes |
 |---|---|---|
-| id | text | Auto-assigned `T-1`, `T-2`, … (`T-0` reserved for the suggestions ledger) |
+| id | text | Auto-assigned `T-1`, `T-2`, … |
 | title | text | One-line summary |
 | description | text | Markdown |
 | category | text | perf, security, feature, bug, chore |

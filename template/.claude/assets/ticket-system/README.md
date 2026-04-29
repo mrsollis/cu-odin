@@ -4,7 +4,7 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 ## Files
 
-- `schema.sql` — DDL for `tickets` and `ticket_comments`. Apply via Supabase migrations or `psql -f`.
+- `schema.sql` — DDL for the `tickets` table. Apply via Supabase migrations or `psql -f`.
 
 ## Schema
 
@@ -12,7 +12,7 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 | Column | Type | Notes |
 |---|---|---|
-| id | text PK | Auto-assigned via `next_ticket_id()` → `T-1`, `T-2`, … (`T-0` reserved for the suggestions ledger) |
+| id | text PK | Auto-assigned via `next_ticket_id()` → `T-1`, `T-2`, … |
 | title | text | |
 | description | text | Markdown |
 | status | enum | `backlog` \| `active` \| `qa` \| `complete` |
@@ -28,37 +28,39 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 | branch_name | text | e.g. `ticket/t-123` |
 | blocked_reason | text | First-class field; status stays `active` |
 | pr_url | text | Optional |
-| metadata | jsonb | Project-specific extension slot (see below) |
+| metadata | jsonb | Orchestrator-reserved keys + project extension slot (see below) |
 | created_at, updated_at, completed_at | timestamptz | Auto-maintained |
 
 `updated_at` auto-updates via trigger. `depends_on` is validated on every INSERT/UPDATE — unknown ids and self-references are rejected.
 
-### Project-specific metadata
+### Metadata namespace
 
-`metadata` is a free-form `jsonb` column (default `'{}'`). Use it to attach project-specific context that should travel with a ticket — for example, in-app source pointers when a ticket originates from inside the product, links to external systems, or feature flags. Cu-odin's stock skills don't read or write `metadata`; it's reserved for the project. Add expression indexes (`create index ... on tickets ((metadata->>'key'))`) per-project if you query into it frequently.
+`metadata` is a `jsonb` column (default `'{}'`) shared by the orchestrator and the project. The orchestrator owns a fixed set of top-level keys; everything else is yours. Stock cu-odin reads and writes only the reserved keys below.
+
+**Orchestrator-reserved keys** (written by [@odin](../../agents/odin.md)):
+
+| Key | Shape | Written when |
+|---|---|---|
+| `locked_tests` | `{ files: [{path, sha256}], coverage: [{ac, file}], locked_at }` | Phase 1.5 — TDD locks the test contract |
+| `qa` | `{ checklist: "<markdown>", posted_at }` | Phase 4 — QA handoff |
+| `outcome` | markdown string | Phase 5 — friendly "what changed" summary |
+| `telemetry` | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes, blocked events) | Phase 5 — ship |
+| `cancellation` | `{ reason, when }` | `/process-ticket` cancel |
+| `comments` | array of `{ author, when, body }` | Append-only inter-agent context — used sparingly when context truly needs to be shared between agents or sessions, since most run state already has a dedicated key |
+
+Writes use `jsonb_set` / `||` so reserved-key updates never clobber project keys. See odin.md and process-ticket/SKILL.md for the canonical UPDATE statements.
+
+**Project keys** live alongside under any other top-level name — for example, in-app source pointers when a ticket originates from inside the product, links to external systems, or feature flags. Add expression indexes (`create index ... on tickets ((metadata->>'key'))`) per-project if you query into them frequently.
 
 Project-specific Postgres triggers can also observe ticket status transitions to drive side effects (notifications, threaded replies, reactions on a source message, etc.) — those triggers live alongside the project's other migrations, never inside this asset.
-
-**`ticket_comments`**
-- `id` bigint PK
-- `ticket_id` text → `tickets.id` (cascade delete)
-- `body` text
-- `created_at` timestamptz
 
 ## Conventions
 
 ### Ticket ids
 Auto-assigned by `next_ticket_id()` as `T-1`, `T-2`, … . The `id` column has the function as its default, so callers omit `id` on insert. Each Supabase project has its own sequence; ids only need to be unique within a database.
 
-### Suggestions ledger ticket
-The fixed id `T-0` is reserved for the per-project suggestions ledger — the orchestrator appends MEDIUM/LOW review findings to it as `ticket_comments`. Seed it once after applying the schema, **before any other inserts** so the sequence still starts at 1:
-
-```sql
-insert into tickets (id, title, description, status, category, priority)
-values ('T-0', 'Non-blocking suggestions ledger',
-        'Accumulated MEDIUM/LOW review findings. Append as comments.',
-        'backlog', 'chore', 'low');
-```
+### Non-blocking suggestions
+There is no persistent suggestions ledger. At Phase 4 QA handoff, odin surfaces accumulated MEDIUM/LOW findings to the user and asks whether to file each as its own ticket (via `/add-ticket`) or drop it. Suggestions the user skips are gone — by design, since this system is headless-first and a queue of un-triaged debt entries adds noise without adding signal.
 
 ### Status transitions during a run
 - Plan accepted → `status='active'`, `labels` includes `'Exec: Active'`
@@ -69,7 +71,7 @@ values ('T-0', 'Non-blocking suggestions ledger',
 A blocked in-flight ticket stays `status='active'` and sets `blocked_reason`. There is no `blocked` enum value — keeping it `active` ensures it stays visible in in-flight queries instead of disappearing into a separate bucket.
 
 ### QA checklist
-Posted as a `ticket_comments` row whose `body` starts with `## QA Testing Checklist`. Never written into `tickets.description`.
+Written to `metadata.qa.checklist` (markdown string) at Phase 4 handoff. Never written into `tickets.description`.
 
 ### Ready-queue query (used by `/process-ticket`)
 
@@ -93,6 +95,5 @@ ORDER BY
 
 1. Create a Supabase project (or use any Postgres).
 2. Apply `schema.sql`.
-3. Seed `T-0` (suggestions ledger) per the example above.
 
 That's it — no per-repo config to fill in. The Supabase project id lives in the Supabase MCP server config; nothing else to set.

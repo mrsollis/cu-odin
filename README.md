@@ -42,11 +42,11 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
-3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 in a ticket comment. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
+3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 into the ticket's `metadata.locked_tests`. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
 4. **Phase 2 — Coder ↔ reviewer loop** per track. Up to 2 sonnet rounds. If still stuck *and* the failure mode is reasoning depth (not spec ambiguity), escalates to the opus elite pair for up to 2 more rounds. Hard cap of 4 total iterations per track. If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
 5. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
 6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files.
-7. **Phase 4 — QA handoff.** Ticket → `qa`, posts a QA testing checklist as a ticket comment.
+7. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` alongside structured run telemetry in `metadata.telemetry`.
 8. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
 
 ### Headless mode
@@ -67,7 +67,7 @@ Your design system. Convention is one topic per file with numeric prefixes (`00-
 
 ### `.claude/assets/ticket-system/schema.sql`
 
-Apply this to your Supabase project (or any Postgres) to set up the `tickets` and `ticket_comments` tables that replace Linear/Jira. Then seed a suggestions-ledger ticket per the folder's README.
+Apply this to your Supabase project (or any Postgres) to set up the `tickets` table that replaces Linear/Jira. Per-ticket history (locked-tests manifest, QA checklist, outcome notes, run telemetry, inter-agent comments) lives in the `metadata` jsonb column — there is no separate comments table.
 
 The orchestrator reads/writes tickets via the Supabase MCP tool, so make sure that's wired up in your Claude Code config.
 

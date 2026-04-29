@@ -4,7 +4,6 @@
 -- Usage:
 --   1. Create a Supabase project (or any Postgres database) for the repo.
 --   2. Apply this file via Supabase migrations or `psql -f schema.sql`.
---   3. Seed the suggestions ledger ticket as 'T-0' (see README).
 
 create type ticket_status as enum ('backlog', 'active', 'qa', 'complete');
 
@@ -14,7 +13,7 @@ create or replace function next_ticket_id() returns text
 language sql as $$ select 'T-' || nextval('tickets_id_seq'); $$;
 
 create table tickets (
-  id              text primary key default next_ticket_id(), -- e.g. 'T-1', 'T-2'; 'T-0' reserved for the suggestions ledger
+  id              text primary key default next_ticket_id(), -- e.g. 'T-1', 'T-2'
   title           text not null,
   description     text not null default '',
   status          ticket_status not null default 'backlog',
@@ -32,7 +31,7 @@ create table tickets (
   branch_name     text,                                   -- e.g. 'ticket/t-123'
   blocked_reason  text,                                   -- first-class; status stays 'active'
   pr_url          text,
-  metadata        jsonb not null default '{}',            -- project-specific extension slot (e.g. in-app source pointers, external system links)
+  metadata        jsonb not null default '{}',            -- orchestrator-reserved keys (outcome, telemetry, qa, locked_tests, cancellation, comments) + project extension slot
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   completed_at    timestamptz
@@ -43,15 +42,6 @@ create index tickets_ready_queue_idx     on tickets (status, priority, tier);
 create index tickets_labels_gin          on tickets using gin (labels);
 create index tickets_depends_on_gin      on tickets using gin (depends_on);
 create index tickets_files_affected_gin  on tickets using gin (files_affected);
-
-create table ticket_comments (
-  id          bigint generated always as identity primary key,
-  ticket_id   text not null references tickets(id) on delete cascade,
-  body        text not null,
-  created_at  timestamptz not null default now()
-);
-
-create index ticket_comments_ticket_id_idx on ticket_comments (ticket_id, created_at desc);
 
 create or replace function set_updated_at() returns trigger
 language plpgsql as $$

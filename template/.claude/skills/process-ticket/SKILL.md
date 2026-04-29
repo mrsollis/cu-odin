@@ -105,7 +105,7 @@ RETURNING id, title, category, priority, tier, effort_estimate, description,
    - The session mode (interactive/headless).
    - A note: "Ticket already claimed; branch already created. Skip ticket-creation steps. Run through QA handoff (Phase 4). Do not ship — the dispatcher manages commit and the user controls Phase 5."
 
-6. **Wait for `@odin`** to reach Phase 4 (status → `qa`, QA checklist comment posted) — or to halt (BLOCKED / elite-gate halt).
+6. **Wait for `@odin`** to reach Phase 4 (status → `qa`, `metadata.qa.checklist` written) — or to halt (BLOCKED / elite-gate halt).
 
 7. **Per-ticket commit policy** (see below).
 
@@ -243,12 +243,26 @@ RETURNING id, title;
 The `AND status = 'backlog'` guard prevents double-assignment.
 
 ### Append progress / notes
-Write to `ticket_comments` (do **not** mutate the description):
+Append a comment object to `metadata.comments` (do **not** mutate the description). One element per note. Schema for each element: `{ author, when, body }` — `author` is the agent/role posting (e.g. `odin`, `coder-web`, `tdd`, `data-architect`, `dispatcher`).
 
 ```sql
-INSERT INTO public.ticket_comments (ticket_id, body)
-VALUES ('<id>', '<markdown body>');
+UPDATE public.tickets
+SET metadata = jsonb_set(
+  metadata,
+  '{comments}',
+  COALESCE(metadata->'comments', '[]'::jsonb) || jsonb_build_array(
+    jsonb_build_object(
+      'author', '<agent-or-role>',
+      'when', to_jsonb(now()),
+      'body', '<markdown body>'
+    )
+  ),
+  true
+)
+WHERE id = '<id>';
 ```
+
+Use this only when context genuinely needs to be shared between agents or with a future session. Most run state already lives in `metadata.locked_tests`, `metadata.qa`, `metadata.outcome`, and `metadata.telemetry`.
 
 ### Update files_affected mid-flight
 
@@ -284,11 +298,11 @@ SET status = 'backlog',
     assigned_at = NULL,
     branch_name = NULL,
     blocked_reason = NULL,
-    labels = array_remove(labels, 'Exec: Active')
+    labels = array_remove(labels, 'Exec: Active'),
+    metadata = metadata || jsonb_build_object(
+      'cancellation', jsonb_build_object('reason', '<why>', 'when', to_jsonb(now()))
+    )
 WHERE id = '<id>';
-
-INSERT INTO public.ticket_comments (ticket_id, body)
-VALUES ('<id>', '## Cancelled\n<reason>');
 ```
 
 ### My in-flight tickets
@@ -309,7 +323,13 @@ SELECT status, count(*) FROM public.tickets GROUP BY status ORDER BY status;
 
 ```sql
 SELECT * FROM public.tickets WHERE id = '<id>';
-SELECT body, created_at FROM public.ticket_comments WHERE ticket_id = '<id>' ORDER BY created_at;
+-- Inspect orchestrator-reserved metadata sections:
+SELECT metadata->'outcome'      AS outcome,
+       metadata->'telemetry'    AS telemetry,
+       metadata->'qa'           AS qa,
+       metadata->'locked_tests' AS locked_tests,
+       metadata->'comments'     AS comments
+FROM public.tickets WHERE id = '<id>';
 ```
 
 ## Multi-agent rules

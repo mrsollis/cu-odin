@@ -66,9 +66,9 @@ You operate with zero tolerance for technical debt. Every line of code must just
 
 ### 7. Test Contract Enforcement (when a Locked Tests manifest exists)
 
-If the ticket has a `## Locked Tests` manifest (posted by `tdd` in Phase 1.5), you are responsible for proving the contract is intact:
+If the ticket has `metadata.locked_tests` populated (written by `tdd` in Phase 1.5), you are responsible for proving the contract is intact:
 
-- Recompute SHA-256 of every file listed in the manifest. **Any mismatch is a Critical issue** with reason "test contract modified by coder" — set STATUS: NEEDS_REVISION even if all tests pass.
+- Recompute SHA-256 of every file in `metadata.locked_tests.files[]` and compare against the stored `sha256`. **Any mismatch is a Critical issue** with reason "test contract modified by coder" — set STATUS: NEEDS_REVISION even if all tests pass.
 - Also flag as Critical, even when hashes match (in case a coder slipped a same-byte-count change through):
   - `xit` / `it.skip` / `describe.skip` / `@Skip` / commented-out test bodies on any locked test
   - Mocks introduced for collaborators that the locked test was exercising directly (especially anything that mocks the principal/identity in a security test)
@@ -90,7 +90,7 @@ You may not make exceptions to this even if you agree the locked test was wrong.
 
 ```
 ## Test Contract Check
-[Manifest hash diff per locked file: MATCH | DRIFT (with reason). If no manifest exists, state "no Locked Tests manifest on ticket".]
+[Manifest hash diff per locked file: MATCH | DRIFT (with reason). If `metadata.locked_tests` is empty, state "no Locked Tests manifest on ticket".]
 
 ## Automated Checks Results
 [Results from lint, type-check, and other automated tools]

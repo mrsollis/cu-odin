@@ -27,7 +27,7 @@ You are not faster — you are **more skeptical of the prior contract**.
 
 ## Lock Protocol
 
-Same as `tdd`: red run confirmed, SHA-256 per file, post `## Locked Tests` manifest as a ticket comment. Add an `## Update Reason` block listing every test that changed and why (per the categories in §1 above).
+Same as `tdd`: red run confirmed, SHA-256 per file, write the manifest into `metadata.locked_tests`. Set `update_reason` to a structured list — one entry per changed test, naming the file and the category (per §1 above) that applied.
 
 ## Output: Handoff Status
 

@@ -40,29 +40,35 @@ Write **failing** tests, anchored to invariants, before the coder runs. Lock the
 
 If you cannot write a deterministic test for an acceptance criterion (e.g., the AC says "feels snappy" or "looks good"), do **not** invent a brittle proxy. Return `STATUS: NEEDS_SPEC_CLARIFICATION` listing the unverifiable ACs and the questions that would unblock you.
 
+The reviewer enforces this contract by reading `metadata.locked_tests` and recomputing the listed file hashes — drift is an automatic NEEDS_REVISION.
+
 ## Lock Protocol
 
 After writing the tests:
 
 1. Confirm they all run **red** (the implementation doesn't exist yet) by invoking the stack's test command. Web: `pnpm run test`. Flutter: `flutter test`. A green test at this stage is a tautology — fix or remove it.
 2. Compute SHA-256 of every test file you created or modified.
-3. Post a `## Locked Tests` manifest as a comment on the ticket (using the Supabase MCP tools, same convention as the rest of the harness — see [.claude/assets/ticket-system/](../assets/ticket-system/)). The manifest is the contract the reviewer enforces.
+3. Write the manifest into `tickets.metadata.locked_tests` via the Supabase MCP tools. Use `metadata = metadata || jsonb_build_object('locked_tests', <manifest>)` so existing keys are preserved. The manifest is the contract the reviewer enforces.
 
-## Locked Tests manifest format
+## Locked Tests manifest shape
 
-```
-## Locked Tests
-TRACK: [track name from plan]
-TEST_FILES:
-  - <path>  sha256:<64-hex>
-  - <path>  sha256:<64-hex>
-COVERAGE:
-  AC-1: <test file>::<test name>
-  AC-2: <test file>::<test name>
-  SEC-authz: <test file>::<test name>
-  DATA-rls: <test file>::<test name>
-  T-117 (regression): <test file>::<test name>
-RED_RUN: confirmed [N] tests fail as expected against the current (unimplemented) state
+```json
+{
+  "locked_tests": {
+    "track": "<track name from plan>",
+    "locked_at": "2026-04-29T18:22:01Z",
+    "files": [
+      { "path": "<path>", "sha256": "<64-hex>" }
+    ],
+    "coverage": [
+      { "item": "AC-1",      "file": "<test file>", "test": "<test name>" },
+      { "item": "SEC-authz", "file": "<test file>", "test": "<test name>" },
+      { "item": "DATA-rls",  "file": "<test file>", "test": "<test name>" },
+      { "item": "T-117 (regression)", "file": "<test file>", "test": "<test name>" }
+    ],
+    "red_run": "confirmed [N] tests fail as expected against the current (unimplemented) state"
+  }
+}
 ```
 
 The manifest is the source of truth for which files are locked. The reviewer recomputes the hashes; any drift is an automatic NEEDS_REVISION.
@@ -87,10 +93,10 @@ The reviewer will flag mocks that make a test tautological as a Critical issue a
 You may revise a locked test only if:
 
 1. The plan changed (new AC added, AC removed, AC reworded materially), OR
-2. The coder posted a comment requesting tdd re-evaluation with a specific reason that survives scrutiny, OR
+2. The coder emitted `STATUS: BLOCKED` with `reason: locked_test_disputed` and the dispute survives scrutiny, OR
 3. odin escalated to `tdd-elite` and you are that escalation.
 
-When you revise, post an updated `## Locked Tests` manifest with the new hashes and an `## Update Reason` block explaining which trigger applied. Never silently update.
+When you revise, overwrite `metadata.locked_tests` with the new hashes and add an `update_reason` field naming which trigger applied (e.g. `"plan_change"`, `"coder_dispute"`, `"tdd_elite"`). Never silently update.
 
 ## Output: Handoff Status
 
@@ -111,6 +117,6 @@ NEXT_ACTION: [one sentence — "ready for coder" or the specific clarification n
 2. NEVER mock the principal/identity in a security test — use real seeded users
 3. NEVER omit the AC/SEC/DATA tag comment on a contract test — that tag is how weakening gets detected
 4. NEVER guess at an unverifiable AC — return `NEEDS_SPEC_CLARIFICATION` instead
-5. ALWAYS confirm the red run before posting the lock manifest
-6. ALWAYS post the manifest as a ticket comment (not just in your response) — the reviewer reads it from the ticket
-7. If revising a locked test, ALWAYS post the trigger reason — silent updates are forbidden
+5. ALWAYS confirm the red run before writing the lock manifest
+6. ALWAYS write the manifest into `metadata.locked_tests` (not just in your response) — the reviewer reads it from the ticket row
+7. If revising a locked test, ALWAYS include `update_reason` in the new manifest — silent updates are forbidden
