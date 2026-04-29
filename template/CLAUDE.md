@@ -6,6 +6,15 @@
 
 This file orients Claude agents to the repo. The two project-specific inputs are [.claude/rules/domain.md](.claude/rules/domain.md) (what the product is) and [.claude/rules/design-system/](.claude/rules/design-system/) (how it looks). Everything else is portable across projects.
 
+> **Do not modify the vendored harness files.** This harness ships from the [cu-odin](https://github.com/mrsollis/cu-odin) library and is updated regularly upstream. The host repo is free to add its own agents, skills, or assets alongside these — but the following files are vendored from cu-odin and will be overwritten on the next sync, so any change to them must be raised against cu-odin instead of patched here:
+>
+> - `CLAUDE.md` (this file)
+> - `.claude/agents/odin.md`, `ux-design.md`, `tdd.md`, `tdd-elite.md`, `coder-web.md`, `coder-flutter.md`, `coder-elite.md`, `code-review.md`, `code-review-elite.md`, `data-architect.md`, `security-review.md`
+> - `.claude/skills/add-ticket/`, `.claude/skills/process-ticket/`
+> - `.claude/assets/ticket-system/`
+>
+> Anything else under `.claude/` (new agents, new skills, new assets) is host-repo territory and stays put.
+
 ## Read first
 
 | Order | File | Why |
