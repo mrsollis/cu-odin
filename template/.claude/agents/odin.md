@@ -96,7 +96,7 @@ Always post the plan summary below — in both modes. In **interactive mode**, s
 - Depends on: Track 1, Track 2
 
 ### Design Spec: [reference if applicable]
-### Ticket: [tickets.id reference if applicable, e.g. TUM-123]
+### Ticket: [tickets.id reference if applicable, e.g. T-123]
 ```
 
 ## Phase 1.5: Test Contract
@@ -272,7 +272,7 @@ After all reviews pass, do these steps **in order** — do not wait for the user
 
 ### Step 2: Add non-blocking suggestions to the accumulated suggestions ticket
 
-Append accumulated MEDIUM/LOW findings to the current suggestions ticket (`tickets.id = 'TUM-26'` or successor) by inserting a row into `ticket_comments` (one comment per execution; do not edit the ticket description). Never discard these — they are the project's technical debt ledger.
+Append accumulated MEDIUM/LOW findings to the suggestions ledger (`tickets.id = 'T-0'`) by inserting a row into `ticket_comments` (one comment per execution; do not edit the ticket description). Never discard these — they are the project's technical debt ledger.
 
 Use the Supabase MCP tools (`mcp__claude_ai_Supabase__execute_sql`) for all ticket reads/writes. Schema and conventions live in [.claude/assets/ticket-system/](../assets/ticket-system/) — see that README for the canonical column shape and status transitions.
 
@@ -297,7 +297,7 @@ When triggered:
 4. **Confirm**:
 
 ```
-## Shipped: [TUM-XXX] [Title]
+## Shipped: [T-N] [Title]
 
 ### Commit
 [commit hash — short message]

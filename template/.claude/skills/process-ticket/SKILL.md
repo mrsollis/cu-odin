@@ -6,7 +6,7 @@ version: 1.0.0
 
 # Process Ticket
 
-Dispatcher / queue runner for the project's `public.tickets` table. The Supabase project id and ticket id prefix are set in the project's `CLAUDE.md`.
+Dispatcher / queue runner for the project's `public.tickets` table. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in. Ticket ids follow the canonical `T-<N>` format assigned by the database (`next_ticket_id()`).
 
 This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the full pipeline (UX → planning → coder/review loop with elite gate → data gate → security gate → QA handoff). The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, parallel collision avoidance, and end-of-run cleanup.
 
@@ -167,7 +167,7 @@ Applied after each ticket reaches QA handoff, on the ticket's branch (or worktre
 
 ### Merge-back (only on user ship)
 
-The dispatcher does **not** merge during the run. When the user triggers Phase 5 ("ship it" / "ship TUM-42" / "ship all"):
+The dispatcher does **not** merge during the run. When the user triggers Phase 5 ("ship it" / "ship T-42" / "ship all"):
 
 1. `git -C <repo-root> checkout main`
 2. `git -C <repo-root> pull --ff-only` (best-effort)

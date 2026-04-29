@@ -12,7 +12,7 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 | Column | Type | Notes |
 |---|---|---|
-| id | text PK | Human-readable, repo-prefixed (e.g. `TUM-123`) |
+| id | text PK | Auto-assigned via `next_ticket_id()` → `T-1`, `T-2`, … (`T-0` reserved for the suggestions ledger) |
 | title | text | |
 | description | text | Markdown |
 | status | enum | `backlog` \| `active` \| `qa` \| `complete` |
@@ -25,12 +25,19 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 | files_affected | text[] | Used for collision-avoidance during parallel dispatch |
 | assigned_to | text | `odin`, `odin-1`, `odin-2`, … |
 | assigned_at | timestamptz | |
-| branch_name | text | e.g. `ticket/tum-123` |
+| branch_name | text | e.g. `ticket/t-123` |
 | blocked_reason | text | First-class field; status stays `active` |
 | pr_url | text | Optional |
+| metadata | jsonb | Project-specific extension slot (see below) |
 | created_at, updated_at, completed_at | timestamptz | Auto-maintained |
 
 `updated_at` auto-updates via trigger. `depends_on` is validated on every INSERT/UPDATE — unknown ids and self-references are rejected.
+
+### Project-specific metadata
+
+`metadata` is a free-form `jsonb` column (default `'{}'`). Use it to attach project-specific context that should travel with a ticket — for example, in-app source pointers when a ticket originates from inside the product, links to external systems, or feature flags. Cu-odin's stock skills don't read or write `metadata`; it's reserved for the project. Add expression indexes (`create index ... on tickets ((metadata->>'key'))`) per-project if you query into it frequently.
+
+Project-specific Postgres triggers can also observe ticket status transitions to drive side effects (notifications, threaded replies, reactions on a source message, etc.) — those triggers live alongside the project's other migrations, never inside this asset.
 
 **`ticket_comments`**
 - `id` bigint PK
@@ -40,15 +47,15 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 ## Conventions
 
-### Ticket id prefix
-Per-repo, set in the project's `CLAUDE.md` (e.g. `TUM-` for Telos).
+### Ticket ids
+Auto-assigned by `next_ticket_id()` as `T-1`, `T-2`, … . The `id` column has the function as its default, so callers omit `id` on insert. Each Supabase project has its own sequence; ids only need to be unique within a database.
 
 ### Suggestions ledger ticket
-Each repo designates one ticket (e.g. `TUM-26`) where the orchestrator appends MEDIUM/LOW review findings as comments. Seed it manually after applying the schema:
+The fixed id `T-0` is reserved for the per-project suggestions ledger — the orchestrator appends MEDIUM/LOW review findings to it as `ticket_comments`. Seed it once after applying the schema, **before any other inserts** so the sequence still starts at 1:
 
 ```sql
 insert into tickets (id, title, description, status, category, priority)
-values ('<PREFIX>-26', 'Non-blocking suggestions ledger',
+values ('T-0', 'Non-blocking suggestions ledger',
         'Accumulated MEDIUM/LOW review findings. Append as comments.',
         'backlog', 'chore', 'low');
 ```
@@ -86,8 +93,6 @@ ORDER BY
 
 1. Create a Supabase project (or use any Postgres).
 2. Apply `schema.sql`.
-3. Seed the suggestions ledger ticket with the repo's prefix.
-4. Add to the project `CLAUDE.md`:
-   - Supabase project id
-   - Ticket id prefix
-   - Suggestions ledger ticket id
+3. Seed `T-0` (suggestions ledger) per the example above.
+
+That's it — no per-repo config to fill in. The Supabase project id lives in the Supabase MCP server config; nothing else to set.

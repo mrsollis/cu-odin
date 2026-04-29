@@ -36,7 +36,7 @@ Write **failing** tests, anchored to invariants, before the coder runs. Lock the
    - NOT NULL / CHECK / FK / UNIQUE constraints reject bad rows
    - Migrations either include a verifiable down-path test, or the migration metadata declares `irreversible: true` with a one-line reason
    Tag each data test with the DATA item ID (e.g. `// DATA-rls`, `// DATA-fk`).
-4. **Regression tests** for any prior bug the ticket references — one permanent test per fixed bug, named with the ticket id (e.g. `it('TUM-117: handles empty cart on checkout')`).
+4. **Regression tests** for any prior bug the ticket references — one permanent test per fixed bug, named with the ticket id (e.g. `it('T-117: handles empty cart on checkout')`).
 
 If you cannot write a deterministic test for an acceptance criterion (e.g., the AC says "feels snappy" or "looks good"), do **not** invent a brittle proxy. Return `STATUS: NEEDS_SPEC_CLARIFICATION` listing the unverifiable ACs and the questions that would unblock you.
 
@@ -61,7 +61,7 @@ COVERAGE:
   AC-2: <test file>::<test name>
   SEC-authz: <test file>::<test name>
   DATA-rls: <test file>::<test name>
-  TUM-117 (regression): <test file>::<test name>
+  T-117 (regression): <test file>::<test name>
 RED_RUN: confirmed [N] tests fail as expected against the current (unimplemented) state
 ```
 

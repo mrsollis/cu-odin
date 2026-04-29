@@ -4,13 +4,17 @@
 -- Usage:
 --   1. Create a Supabase project (or any Postgres database) for the repo.
 --   2. Apply this file via Supabase migrations or `psql -f schema.sql`.
---   3. Set the repo's ticket id prefix and Supabase project id in CLAUDE.md.
---   4. Seed the suggestions ledger ticket (see README).
+--   3. Seed the suggestions ledger ticket as 'T-0' (see README).
 
 create type ticket_status as enum ('backlog', 'active', 'qa', 'complete');
 
+create sequence tickets_id_seq start 1;
+
+create or replace function next_ticket_id() returns text
+language sql as $$ select 'T-' || nextval('tickets_id_seq'); $$;
+
 create table tickets (
-  id              text primary key,                       -- human-readable, e.g. 'TUM-123'
+  id              text primary key default next_ticket_id(), -- e.g. 'T-1', 'T-2'; 'T-0' reserved for the suggestions ledger
   title           text not null,
   description     text not null default '',
   status          ticket_status not null default 'backlog',
@@ -25,9 +29,10 @@ create table tickets (
   files_affected  text[] not null default '{}',           -- used for collision-avoidance during parallel dispatch
   assigned_to     text,                                   -- 'odin', 'odin-1', 'odin-2', ...
   assigned_at     timestamptz,
-  branch_name     text,                                   -- e.g. 'ticket/tum-123'
+  branch_name     text,                                   -- e.g. 'ticket/t-123'
   blocked_reason  text,                                   -- first-class; status stays 'active'
   pr_url          text,
+  metadata        jsonb not null default '{}',            -- project-specific extension slot (e.g. in-app source pointers, external system links)
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   completed_at    timestamptz

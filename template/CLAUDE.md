@@ -38,16 +38,11 @@ If a repo contains both, the orchestrator splits work into per-stack sub-tracks.
 
 Tickets live in Supabase. Schema and conventions: [.claude/assets/ticket-system/](.claude/assets/ticket-system/).
 
-- `tickets` table — `id` (text, repo-prefixed e.g. `TUM-123`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `branch_name`, `blocked_reason`, `labels` (text[])
+- `tickets` table — `id` (text, auto-assigned `T-1`, `T-2`, … via `next_ticket_id()`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `branch_name`, `blocked_reason`, `labels` (text[]), `metadata` (jsonb — project extension slot)
 - `ticket_comments` table — append-only, used for QA checklists and the suggestions ledger
 - The orchestrator and dispatcher read/write via Supabase MCP tools
 - DB trigger validates `depends_on` (rejects unknown ids and self-references)
-- One ticket per repo serves as the **suggestions ledger** — the orchestrator appends MEDIUM/LOW review findings to it as comments. Seed it manually after applying the schema.
-
-**Per-repo config** (set below in this file):
-- Supabase project id: _set me_
-- Ticket id prefix: _set me, e.g._ `TUM-`
-- Suggestions ledger ticket id: _set me, e.g._ `TUM-26`
+- The fixed id `T-0` is the **suggestions ledger** — the orchestrator appends MEDIUM/LOW review findings to it as `ticket_comments`. Seed it once after applying the schema.
 
 ### Working with tickets
 
@@ -98,4 +93,4 @@ CLAUDE.md
 .claude/rules/domain.md         # file exists — replace contents
 ```
 
-Then write the project-specific [.claude/rules/domain.md](.claude/rules/domain.md) and fill in [.claude/rules/design-system/](.claude/rules/design-system/). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) to the project's Supabase, seed the suggestions ledger ticket, and fill in the per-repo config above (Supabase project id, ticket id prefix, suggestions ledger ticket id). Nothing else to configure.
+Then write the project-specific [.claude/rules/domain.md](.claude/rules/domain.md) and fill in [.claude/rules/design-system/](.claude/rules/design-system/). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) to the project's Supabase and seed `T-0` (suggestions ledger). Nothing else to configure — the Supabase project id lives in the Supabase MCP server config.
