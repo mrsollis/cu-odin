@@ -363,7 +363,7 @@ When triggered:
 
    Keep it honest and concrete — no marketing voice.
 
-5. **Update the ticket** in a single UPDATE: set `status = 'complete'`, `completed_at = now()`, `pr_url` if known. Clear `assigned_to`, `assigned_at`, `branch_name`, and `blocked_reason`. Remove any remaining in-progress labels (`QA: Testing`, `Exec: Active`) from `labels`. **Merge** both `outcome` (markdown string) and `telemetry` (run-telemetry block) into `metadata` via `||` so existing keys (project keys, `qa`, `locked_tests`) are preserved:
+5. **Update the ticket** in a single UPDATE: set `status = 'complete'`, `completed_at = now()`, `pr_url` if known. Clear `assigned_to`, `assigned_at`, `branch_name`, and `blocked_reason`. Remove any remaining in-progress labels (`QA: Testing`, `Exec: Active`) from `labels`. **Merge** both `outcome` (markdown string) and `telemetry` (run-telemetry block) into `metadata` via `||` so existing keys (project keys, `qa`, `locked_tests`) are preserved. Writing the metadata and status flip in the same statement is intentional — Postgres row triggers see the full `NEW` row, and Supabase Realtime payloads carry it too, so any project-specific trigger wired to the `→ complete` transition can read `NEW.metadata->'outcome'` and `NEW.metadata->'telemetry'` directly:
 
    ```sql
    UPDATE public.tickets
