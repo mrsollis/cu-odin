@@ -90,8 +90,7 @@ async function main() {
   applyGroup(groups.domain, decisions.domain, created, overwritten, skipped);
   applyGroup(groups.designSystem, decisions.designSystem, created, overwritten, skipped);
   applyGroup(groups.skills, decisions.skills, created, overwritten, skipped);
-  // Tickets are always copy-if-missing, never overwrite, never prompted.
-  applyGroup(groups.tickets, "missing-only", created, overwritten, skipped);
+  applyGroup(groups.tickets, decisions.tickets, created, overwritten, skipped);
 
   printSummary({ created, overwritten, skipped });
 }
@@ -154,6 +153,16 @@ async function promptDecisions(groups) {
     exists: dsExists,
     questionExists: "Replace the existing design-system/ with the placeholder stub? (this will overwrite your design system docs)",
     questionMissing: "Stub in design-system/?",
+    defaultIfExists: false,
+    defaultIfMissing: true,
+  });
+
+  const ticketsExists = groupExists(groups.tickets);
+  decisions.tickets = await ask({
+    label: groups.tickets.label,
+    exists: ticketsExists,
+    questionExists: "Overwrite the existing ticket-system assets (including schema.sql) with the latest from this cu-odin release?",
+    questionMissing: "Install ticket-system assets?",
     defaultIfExists: false,
     defaultIfMissing: true,
   });
@@ -278,9 +287,7 @@ Interactive prompts:
   - Stub in .claude/rules/domain.md?        (default: no if it exists, yes if not)
   - Stub in .claude/rules/design-system/?   (default: no if it exists, yes if not)
   - Overwrite .claude/skills/?              (default: no if they exist, yes if not)
-
-Always installed (no prompt):
-  - .claude/assets/ticket-system/  copy-if-missing, never overwrites your edits
+  - Overwrite .claude/assets/ticket-system/?(default: no if they exist, yes if not)
 
 Options:
   -y, --yes        Accept defaults non-interactively (safest in CI)
