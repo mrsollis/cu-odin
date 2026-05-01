@@ -50,9 +50,9 @@ State the mode at the top of the first response: `Mode: headless — auto-commit
 **Before claiming any ticket, confirm the dispatcher can actually deliver it.** The claim is a commitment; never make it before knowing the pipeline can run.
 
 - **Single-agent path** (`/process-ticket`, `next`, `--loop`, `<id>`, `list` selection): you (parent Claude) will *become* Odin inline and fan out to specialists. Confirm the `Agent`/`Task` tool is in your tool list. At top-level Claude this is always true; if it isn't, you are running as a subagent — abort with `STATUS: HARNESS_ERROR — process-ticket invoked without dispatch capability` and do **not** mutate any ticket state.
-- **Orchestrate path** (`--orchestrate N`): the dispatcher will spawn N separate `claude` processes (one per worktree). Confirm the `claude` CLI is invocable from the dispatcher (e.g., `which claude` succeeds, or the harness's chosen headless entry point is reachable). If not, abort with a clear message — no claim, no branch, no state writes.
+- **Orchestrate path** (`--orchestrate N`): the dispatcher will spawn N separate `claude` processes (one per worktree). Probe spawn capability *actively* before any state mutation — `which claude` is necessary but not sufficient, because the harness's permission layer (e.g., `bypassPermissions=deny`) can deny the spawn after the binary resolves. Run a short non-interactive smoke spawn in a temp directory (e.g., `claude --print "ping"` with a few-second timeout) and confirm exit-success. If the probe fails, **do not abort blindly** — first apply the cohort-of-one shortcut (see "Cohort-of-one shortcut" in the dispatch loop). Only abort cleanly (no claim, no branch, no state writes) when the cohort-of-one shortcut does not apply.
 
-If pre-flight 0 fails, exit immediately with the abort message. Do not fall through to the clean-tree check or the claim.
+If pre-flight 0 fails *and* the cohort-of-one shortcut does not apply, exit immediately with the abort message. Do not fall through to the clean-tree check or the claim.
 
 ## Pre-flight 1: clean working tree
 
@@ -151,10 +151,9 @@ The dispatcher orchestrates up to **N parallel `claude` processes**, each in its
 
 Repeat until the ticket queue is empty OR fewer than N tickets are ready (in `--loop`, keep going as new tickets become ready):
 
-1. **Plan the cohort.** Query up to N ready tickets (filters applied). Inspect `files_affected`:
-   - If two tickets touch overlapping files → dispatch them **sequentially**, not in parallel.
-   - If a ticket has empty `files_affected` → treat as potentially touching anything; do not parallelize with other unknowns. Run solo.
-   - Prefer parallelizing tickets in different feature folders.
+1. **Plan the cohort.** Query up to N ready tickets (filters applied). Cohort size is bounded only by `N`, ticket-readiness, and the cohort-of-one shortcut below. **Do not serialize on `files_affected` overlap** — sub-processes work on isolated worktrees, and the dispatcher resolves cross-ticket conflicts at merge-back (see "Merge-back" below). For any ticket with empty `files_affected`, optionally infer likely scope from the ticket's title + description + category + labels and persist via `Update files_affected mid-flight` (below) to give the merge step better signal — but inference is **not** a gate on parallelism.
+
+   **Cohort-of-one shortcut.** Before declaring orchestrate-path failure for any reason (capability block from pre-flight 0, dependency filtering leaving only one ready ticket), check the would-be cohort size. If it is 1, do not spawn a sub-process. Instead, run that single ticket via the single-agent inline path (see "Behavior: no-args / `next` / `--loop`" above) in this same session and announce the fallback explicitly: `Fallback: orchestrate → inline (cohort=1)`. Then continue the `--loop` normally. This silently resolves the common case where capability is denied but parallelism would have been zero anyway — never stop and ask the user which path to take, the prime directive forbids it.
 2. **Claim the cohort** — one atomic UPDATE per ticket using the claim SQL above, with distinct `assigned_to` values: `odin-1`, `odin-2`, …
 3. **For each claimed ticket, spawn a `claude` process:**
    - `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> main`
@@ -211,15 +210,18 @@ Applied after each ticket reaches QA handoff, on the ticket's branch (or worktre
 
 ### Merge-back (only on user ship)
 
-The dispatcher does **not** merge during the run. When the user triggers Phase 5 ("ship it" / "ship T-42" / "ship all"):
+The dispatcher does **not** merge during the run. Cross-ticket file overlap is resolved here, not by serializing the cohort. When the user triggers Phase 5 ("ship it" / "ship T-42" / "ship all"):
 
-1. `git -C <repo-root> checkout main`
-2. `git -C <repo-root> pull --ff-only` (best-effort)
-3. `git -C <repo-root> merge --no-ff ticket/<id-lower> -m "Merge ticket/<id-lower>"`
-4. **If conflicts:** the dispatcher resolves directly (sub-agents lack sibling context). Ask the user before resolving anything non-trivial.
-5. After successful merge, hand off to `@odin` Phase 5 to update the ticket: `status='complete'`, `completed_at=now()`, clear `assigned_to`, `branch_name`, `blocked_reason`, in-progress labels.
-6. `git worktree remove .worktrees/<id-lower>` then `git branch -d ticket/<id-lower>`.
-7. Push only with explicit user confirmation (matches Odin's existing rule).
+1. **Determine merge order.** Group ticket branches by file overlap (declared or inferred `files_affected`). Within an overlap group, merge in claim order (FIFO) so earlier tickets become the rebase base for later ones. Across non-overlapping groups the order does not matter.
+2. **For each ticket branch, in order:**
+   1. `git -C <repo-root> checkout main && git -C <repo-root> pull --ff-only` (best-effort).
+   2. **Pre-rebase the ticket branch onto current main** in its worktree: `git -C .worktrees/<id-lower> rebase main`. This surfaces conflicts in the worktree where the sub-Odin's context still exists — not after a half-finished merge into `main`.
+   3. **Auto-resolve disjoint-hunk conflicts.** If conflicts are limited to non-overlapping line ranges within the same file (no overlapping hunks, no same-symbol redefinition, no delete-vs-modify), apply both sides via a clean three-way merge. The dispatcher only stitches; it does not invent new code.
+   4. **Escalate semantic conflicts to the user.** Overlapping hunks, the same symbol redefined two ways, deleted-vs-modified files, lock-file / generated-file divergence — present the conflict block plus both ticket descriptions plus a recommended resolution. Do not auto-pick a side.
+   5. **Re-run the sub-Odin's quality gates in the rebased worktree** (`pnpm test` / `flutter test` / etc., per stack detection in CLAUDE.md). A passing rebased branch then merges into `main` with `git -C <repo-root> merge --no-ff ticket/<id-lower>`. A failing rebased branch routes back to the ticket's `coder-*` agent for one capped fix-up round before re-attempting merge.
+   6. After a successful merge, hand off to `@odin` Phase 5 to update the ticket: `status='complete'`, `completed_at=now()`, clear `assigned_to`, `branch_name`, `blocked_reason`, in-progress labels. Then `git worktree remove .worktrees/<id-lower>` and `git branch -d ticket/<id-lower>`.
+3. **Locked-tests integrity across merges.** When a later ticket's rebase touches a file an earlier-merged ticket locked in `metadata.locked_tests`, the dispatcher recomputes the SHA-256 hashes after rebase and **before** running gates. Drift means a later ticket weakened an earlier ticket's contract — escalate to the user, do not auto-merge. The user decides whether the change is an additive lock-update or a contract weakening.
+4. Push only with explicit user confirmation (matches Odin's existing rule).
 
 ### End-of-run cleanup
 
@@ -261,10 +263,12 @@ Show the table with `dep_status`. Ask which id to pick up. Warn on blocked selec
 ## Behavior: `--dry-run`
 
 1. Run the same ready-queue query the dispatcher would.
-2. If `--orchestrate N`, also compute the parallelization plan (collision groups based on `files_affected`).
+2. If `--orchestrate N`, also compute the merge-overlap plan (overlap groups based on declared/inferred `files_affected`) — used for merge ordering, not for serializing the cohort.
 3. Print:
    - Tickets that would be claimed, in claim order.
-   - Cohort grouping (which run in parallel, which serialize, why).
+   - Cohort: all ready tickets up to `N` run in parallel.
+   - Merge-overlap groups: which tickets share files and will therefore merge in FIFO order at ship.
+   - Whether the cohort-of-one shortcut would apply (capability block + cohort=1).
    - Filters applied.
 4. Do not claim, branch, or modify anything. `git status` and `git worktree list` are unchanged after.
 
@@ -418,7 +422,7 @@ FROM public.tickets WHERE id = '<id>';
 1. **Never ask to claim** — the user invoked the skill, that's the authorization.
 2. **Capability pre-flight, then clean tree pre-flight** — in that order, always. Abort before any state mutation if either fails.
 3. **One worktree per in-flight ticket** in orchestrate mode. Never share a working directory between sub-processes.
-4. **Inspect `files_affected` before parallelizing** — serialize overlapping or unknown-set tickets.
+4. **Do not serialize on file overlap.** Sub-processes work in isolated worktrees and the dispatcher resolves cross-ticket conflicts at merge-back via rebase + auto-resolve-disjoint-hunks + re-run gates + escalate-semantic-conflicts. `files_affected` is signal for ordering merges, not a gate on parallelism.
 5. **Sub-processes are top-level Odin sessions.** Spawn via the `claude` CLI, not via `Agent(subagent_type=odin)`. Each sub-process runs its own quality gates (code review, data, security) and stops at QA handoff. They do not merge, push, or ship.
 6. **Dispatcher owns merges** — only on user-triggered ship. Conflicts are resolved by the dispatcher with user input on anything non-trivial.
 7. **Worktrees stay until ship.** Tickets in `qa` keep their worktree so the user can review the work before shipping.
