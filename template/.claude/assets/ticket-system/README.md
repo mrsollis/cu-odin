@@ -37,16 +37,18 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 `metadata` is a `jsonb` column (default `'{}'`) shared by the orchestrator and the project. The orchestrator owns a fixed set of top-level keys; everything else is yours. Stock cu-odin reads and writes only the reserved keys below.
 
+> **Reserved namespace — do not reuse these top-level key names for project data.** The orchestrator writes them via `jsonb_set` / `||` and will overwrite anything it finds at these paths. New reserved keys may be added in future cu-odin releases; if you need future-proofing, scope project keys under a single project-owned namespace key (e.g. `metadata.app.*`) so additions upstream can't collide.
+
 **Orchestrator-reserved keys** (written by [@odin](../../agents/odin.md)):
 
-| Key | Shape | Written when |
-|---|---|---|
-| `locked_tests` | `{ files: [{path, sha256}], coverage: [{ac, file}], locked_at }` | Phase 1.5 — TDD locks the test contract |
-| `qa` | `{ checklist: "<markdown>", posted_at }` | Phase 4 — QA handoff |
-| `outcome` | markdown string | Phase 5 — friendly "what changed" summary |
-| `telemetry` | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes, blocked events) | Phase 5 — ship |
-| `cancellation` | `{ reason, when }` | `/process-ticket` cancel |
-| `comments` | array of `{ author, when, body }` | Append-only inter-agent context — used sparingly when context truly needs to be shared between agents or sessions, since most run state already has a dedicated key |
+| Key | Writer phase | jsonb shape | Reserved — do not use for project data |
+|---|---|---|---|
+| `locked_tests` | Phase 1.5 — TDD locks the test contract | `{ files: [{path, sha256}], coverage: [{ac, file}], locked_at }` | ✗ reserved |
+| `qa` | Phase 4 — QA handoff | `{ checklist: "<markdown>", posted_at }` | ✗ reserved |
+| `outcome` | Phase 5 — ship | markdown string ("what changed" summary) | ✗ reserved |
+| `telemetry` | Phase 5 — ship | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes, blocked events) | ✗ reserved |
+| `cancellation` | `/process-ticket` cancel | `{ reason, when }` | ✗ reserved |
+| `comments` | Any phase — append-only inter-agent context, used sparingly since most run state has a dedicated key | array of `{ author, when, body }` | ✗ reserved |
 
 Writes use `jsonb_set` / `||` so reserved-key updates never clobber project keys. See odin.md and process-ticket/SKILL.md for the canonical UPDATE statements.
 
