@@ -44,9 +44,10 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 | Key | Writer phase | jsonb shape | Reserved — do not use for project data |
 |---|---|---|---|
 | `locked_tests` | Phase 1.5 — TDD locks the test contract | `{ files: [{path, sha256}], coverage: [{ac, file}], locked_at }` | ✗ reserved |
+| `rubric` | Phase 1 — odin authors after plan synthesis | `{ authored_at, criteria: [{id, text, scale}] }` — 5–8 user-visible outcome criteria, scored at Phase 3.5 by the `evaluator` agent. Kept out of coder/reviewer/TDD context to avoid biasing implementation. | ✗ reserved |
 | `qa` | Phase 4 — QA handoff | `{ checklist: "<markdown>", posted_at }` | ✗ reserved |
 | `outcome` | Phase 5 — ship | markdown string ("what changed" summary) | ✗ reserved |
-| `telemetry` | Phase 5 — ship; `/process-ticket` on harness halt | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes, blocked events). Also carries `telemetry.harness_halts: [{ when, cause, detail, worktree }]` — appended by the dispatcher when a ticket is unclaimed because the harness itself failed (sub-process crashed, `STATUS: HARNESS_ERROR`, stale heartbeat, `claude` CLI unavailable). Distinct from `blocked_reason`, which records work-blocks on still-active tickets. | ✗ reserved |
+| `telemetry` | Phase 5 — ship; `/process-ticket` on harness halt | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes including `outcome_gate` + `rubric_pass_count`, blocked events). Also carries `telemetry.harness_halts: [{ when, cause, detail, worktree }]` — appended by the dispatcher when a ticket is unclaimed because the harness itself failed (sub-process crashed, `STATUS: HARNESS_ERROR`, stale heartbeat, `claude` CLI unavailable). Distinct from `blocked_reason`, which records work-blocks on still-active tickets. | ✗ reserved |
 | `cancellation` | `/process-ticket` cancel | `{ reason, when }` | ✗ reserved |
 | `comments` | Any phase — append-only inter-agent context, used sparingly since most run state has a dedicated key | array of `{ author, when, body }` | ✗ reserved |
 
@@ -62,12 +63,12 @@ Project-specific Postgres triggers can also observe ticket status transitions to
 Auto-assigned by `next_ticket_id()` as `T-1`, `T-2`, … . The `id` column has the function as its default, so callers omit `id` on insert. Each Supabase project has its own sequence; ids only need to be unique within a database.
 
 ### Non-blocking suggestions
-There is no persistent suggestions ledger. At Phase 4 QA handoff, odin surfaces accumulated MEDIUM/LOW findings to the user and asks whether to file each as its own ticket (via `/add-ticket`) or drop it. Suggestions the user skips are gone — by design, since this system is headless-first and a queue of un-triaged debt entries adds noise without adding signal.
+There is no persistent suggestions ledger. At Phase 4 QA handoff, odin surfaces accumulated HIGH/MEDIUM/LOW findings to the user and asks whether to file each as its own ticket (via `/add-ticket`) or drop it. Suggestions the user skips are gone — by design, since this system is headless-first and a queue of un-triaged debt entries adds noise without adding signal. Only CRITICAL findings block the coder/review loop; HIGH was demoted to advisory when Phase 3.5 (the `evaluator` outcome gate) was added.
 
 ### Status transitions during a run
-- Plan accepted → `status='active'`, `labels` includes `'Exec: Active'`
-- Phase 4 (QA handoff) → `status='qa'`, replace `'Exec: Active'` with `'QA: Testing'`
-- Phase 5 (ship) → `status='complete'`, clear in-progress labels, clear `assigned_to`/`branch_name`/`blocked_reason`
+- Plan accepted → `status='active'`, `labels` includes `'Exec: Active'`, `metadata.rubric` written by odin
+- Phase 4 (QA handoff) → `status='qa'`, replace `'Exec: Active'` with `'QA: Testing'`, write `metadata.qa.checklist`, delete `.claude/.tmp/rubric-<id>.md` scratch file (`metadata.rubric` retained)
+- Phase 5 (ship) → `status='complete'`, clear in-progress labels, clear `assigned_to`/`branch_name`/`blocked_reason`, write `metadata.outcome` and `metadata.telemetry`
 
 ### Blocked tickets
 A blocked in-flight ticket stays `status='active'` and sets `blocked_reason`. There is no `blocked` enum value — keeping it `active` ensures it stays visible in in-flight queries instead of disappearing into a separate bucket.

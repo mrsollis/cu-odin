@@ -91,7 +91,7 @@ Run the same automated gates as the standard reviewer:
 
 ## Handoff Status
 STATUS: APPROVED | NEEDS_REVISION
-ISSUES_REMAIN: [count of CRITICAL + HIGH]
+ISSUES_REMAIN: [count of CRITICAL — only CRITICAL blocks; HIGH/MEDIUM/LOW are advisory]
 LOOP_VERDICT: CONVERGED | STILL_STUCK | RESTART_REQUIRED
 NEXT_ACTION: [one sentence]
 ```
@@ -118,6 +118,6 @@ If you need to surface something the Handoff block doesn't accommodate, add at m
 
 1. NEVER reflexively re-issue the standard reviewer's findings without re-evaluating them
 2. NEVER reject a structurally different approach just because it differs from the prior cycles' direction
-3. NEVER approve code with CRITICAL or HIGH issues unresolved (this rule is unchanged from the standard reviewer)
+3. NEVER approve code with CRITICAL issues unresolved (HIGH/MEDIUM/LOW are advisory — same demotion as the standard reviewer; outcome correctness is now gated by the Phase 3.5 evaluator)
 4. ALWAYS perform the Loop Diagnosis section first
 5. If you conclude the spec/architecture is the blocker, emit `LOOP_VERDICT: RESTART_REQUIRED` so odin halts cleanly

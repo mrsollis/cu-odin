@@ -91,6 +91,40 @@ Skip this phase for backend-only work, bug fixes, or refactoring that doesn't ch
 
 4. **Identify tasks with no dependency on each other** and group them into parallel execution tracks. Each track gets its own coder-reviewer agent pair.
 
+5. **Author the outcome rubric.** Before posting the plan, write a 5–8-item rubric describing what success looks like from a user-visible perspective. This is the scorecard the Phase 3.5 evaluator will grade against; it is **not** shared with the coder, reviewer, TDD, security-review, or data-architect at any point — those agents must not be biased by it.
+
+   Rules for rubric criteria:
+   - **5–8 items max.** A 30-item rubric fails everything on minor nits. Constrain hard.
+   - **Binary or 0/1/2 only.** No "well-organized", no "feels right" — those are unjudgeable.
+   - **Each criterion ties to a user-visible behavior.** "User can delete drafts they own and gets a confirm step before destruction" is good. "Code is well-organized" is for code-review. "Returns 200 on the happy path" is for TDD. The rubric covers what those agents can't.
+   - **Reject overlap.** Anything mechanically expressible as a test belongs in TDD's manifest, not here. Anything about code quality belongs in code-review. The rubric is for outcome / spirit-of-the-ask judgments only.
+
+   Persist it in two places:
+
+   ```sql
+   UPDATE public.tickets
+   SET metadata = metadata || jsonb_build_object(
+         'rubric', jsonb_build_object(
+           'authored_at', to_jsonb(now()),
+           'criteria', '<jsonb array of {id: "R-1", text: "...", scale: "binary"|"0-2"}>'
+         )
+       )
+   WHERE id = '<this-ticket-id>';
+   ```
+
+   Also write a working-tree copy at `.claude/.tmp/rubric-<ticket-id-lower>.md` (the evaluator reads from file). Ensure `.claude/.tmp/` is gitignored — if not present in `.gitignore`, append the line `.claude/.tmp/` so rubric scratch files don't leak into commits. Format of the markdown file:
+
+   ```
+   # Outcome Rubric — <ticket-id>: <ticket-title>
+
+   - [R-1] <criterion text> — scale: binary
+   - [R-2] <criterion text> — scale: binary
+   - [R-3] <criterion text> — scale: 0-2
+   ...
+   ```
+
+   The rubric is **not** included in the plan post. The user can inspect it via `metadata.rubric` if they want, but the chat output stays focused on tracks and ACs. This is the same bias-avoidance reasoning that keeps the coder out of locked-test internals.
+
 ### Planning Output Format
 
 Always post the plan summary below — in both modes. In **interactive mode**, stop after posting and wait for user approval before spawning coders. In **headless mode**, post the plan and proceed directly to Phase 2 in the same turn.
@@ -166,6 +200,7 @@ If a track touches both stacks (e.g. a backend API change paired with a Flutter 
 - If automated checks fail, the coder fixes them before emitting `STATUS: COMPLETE`. Do not spawn a reviewer until automated checks pass.
 - If the coder emits `STATUS: BLOCKED`, escalate to the user immediately. Do not count this as a loop iteration.
 - **Locked Tests are off-limits to the coder.** Pass the Phase 1.5 Locked Tests manifest in the coder's prompt. Coders MUST NOT modify any file listed there. If the coder believes a locked test is wrong, it must stop and emit `STATUS: BLOCKED` with `reason: locked_test_disputed` and the path/assertion in question — never edit the test directly. A coder that modifies a locked test is producing a NEEDS_REVISION outcome regardless of whether tests pass.
+- **The outcome rubric is also off-limits to the coder.** Same reasoning as locked tests: the coder must not read `metadata.rubric` or `.claude/.tmp/rubric-*.md`. The rubric is the evaluator's scorecard at Phase 3.5; if the coder sees it, they will optimize against it directly and the gate becomes a tautology. Include this prohibition explicitly in the coder's prompt.
 
 ### Step 2: Spawn Code Reviewer
 
@@ -224,9 +259,11 @@ When you HALT without escalating to elite, say so explicitly in the user-facing 
 | Severity | Blocks approval? | Action |
 |----------|------------------|--------|
 | CRITICAL | Yes | Must fix. Loop continues. |
-| HIGH | Yes | Must fix. Loop continues. |
+| HIGH | No | Advisory. Accumulate. Relay to user at QA handoff. |
 | MEDIUM | No | Accumulate. Relay to user at end. |
 | LOW | No | Accumulate. Relay to user at end. |
+
+**Note on the HIGH demotion:** As of the addition of Phase 3.5 (Outcome Gate), code-review's role narrows to "don't ship a maintenance landmine." Outcome correctness is now gated separately by the evaluator. Treating HIGH as blocking caused loop bloat (extra iterations against issues that didn't actually threaten correctness), without proportional signal once outcome has its own gate. CRITICAL stays blocking — those are real bugs, spec gaps, or major design flaws. HIGH/MEDIUM/LOW all surface to the user at QA handoff as advisory findings; the user decides per-item whether to file a follow-up ticket or drop it.
 
 ### Iteration Tracking
 
@@ -272,6 +309,54 @@ After the code-review loop passes (all tracks approved) and the data gate (if an
 - If security issues persist after 2 remediation attempts, escalate to user
 - This is a separate counter from the Phase 2 loop
 
+## Phase 3.5: Outcome Gate
+
+After the security gate clears (and the data gate, if it ran), spawn the `evaluator` agent **once** against the rubric authored in Phase 1. This is the last chance to catch "we built what was asked, not what was needed" before the work goes to QA.
+
+This phase is **not optional** when a rubric exists — every ticket gets a rubric in Phase 1, so every ticket gets evaluated. The only skip case is the same as TDD's: a track with no executable code (pure docs, pure config, pure asset moves) where there's nothing to evaluate. State the skip explicitly in the QA handoff.
+
+1. Spawn `evaluator` with:
+   - Ticket id and rubric file path (`.claude/.tmp/rubric-<ticket-id-lower>.md`).
+   - The list of changed files across all tracks (paths only, not contents).
+   - Test command output (stdout + exit code from the most recent gate run).
+   - Confirmation that Phase 3 (security) cleared.
+   - Stack (`web` or `flutter`).
+
+2. **Do NOT pass to the evaluator:** the coder transcripts, prior code-review findings, planner reasoning, or anything from Phase 2's loop history. The evaluator scores the artifact, not the conversation. (The evaluator's own non-negotiable rules enforce this; you reinforce it by not handing the data over in the first place.)
+
+3. The evaluator runs **one pass**. This counter is separate from the Phase 2 coder-reviewer loop and the Phase 2.5/3 remediation counters.
+
+4. Read the evaluator's `## Handoff Status` block:
+
+**If `STATUS: OUTCOME_PASS`:** Proceed to Phase 4.
+
+**If `STATUS: IMPLEMENTATION_GAP`:**
+- The rubric is right; the code doesn't match it. Spawn a coder in Revision Mode with the failing criteria as the spec. Do not pass the rubric itself to the coder — translate the failing criteria into concrete, behavior-level instructions ("on delete, show a confirmation dialog before destructive action") that don't reveal the rubric's scoring shape.
+- Re-run the `evaluator` (not code-review, not security-review) after the coder's revision.
+- **Budget: 2 remediation rounds.** After 2, halt to user with the remaining failing criteria — at that point the gap is no longer a routine implementation gap; either the rubric was wrong (a `PLAN_GAP` in disguise) or the coder is structurally unable to converge.
+- Locked Tests still apply across these rounds — the reviewer's hash check is not re-run, but the coder still cannot touch locked test files. If they need to, they emit `STATUS: BLOCKED` and you route to `tdd-elite` as usual.
+
+**If `STATUS: PLAN_GAP`:**
+- **Halt immediately.** Do not spawn a coder. The fix is upstream — the spec/plan never set out to deliver the behavior the rubric demands, so no amount of coder revision will close the gap.
+- Surface to the user with: the failing criteria, the evaluator's diagnosis of why each is a `PLAN_GAP`, and a recommendation (typically: revise the ticket description / ACs / rubric and re-run from Phase 1, OR accept the rubric was over-scoped and trim it).
+- This is the load-bearing escape hatch. Without it, an outcome-gate loop spins forever against a problem the coder fundamentally cannot fix. Use it.
+
+### Phase 3.5 Iteration Tracking
+
+```
+Outcome Gate: pass 1 — IMPLEMENTATION_GAP (R-3, R-5) → coder revision round 1
+Outcome Gate: pass 2 — IMPLEMENTATION_GAP (R-5) → coder revision round 2
+Outcome Gate: pass 3 — IMPLEMENTATION_GAP (R-5) → halt to user (budget exhausted)
+```
+
+Or:
+
+```
+Outcome Gate: pass 1 — PLAN_GAP (R-2: rubric demands "all drafts" but plan only covers "owned drafts") → halt to user
+```
+
+Surface the verdict and pass count plainly in the user-facing summary at QA handoff.
+
 ## Phase 4: Completion
 
 After all reviews pass, do these steps **in order** — do not wait for the user to prompt any of them:
@@ -291,8 +376,11 @@ After all reviews pass, do these steps **in order** — do not wait for the user
 ### Security Review
 [SECURE or remediation summary]
 
+### Outcome Gate
+[OUTCOME_PASS in N pass(es), or remediated_N if revisions were needed. Include rubric pass count, e.g. "8/8 criteria met".]
+
 ### Non-Blocking Suggestions
-[Accumulated MEDIUM/LOW findings from all review cycles — consolidated, deduplicated]
+[Accumulated HIGH/MEDIUM/LOW findings from all review cycles — consolidated, deduplicated]
 
 ### Ready for QA
 [One sentence: what the user should test manually]
@@ -300,15 +388,16 @@ After all reviews pass, do these steps **in order** — do not wait for the user
 
 ### Step 2: Surface non-blocking suggestions to the user
 
-Present any accumulated MEDIUM/LOW findings to the user and ask whether to file them as tickets or drop them. If there are zero findings, skip this step entirely.
+Present any accumulated HIGH/MEDIUM/LOW findings to the user and ask whether to file them as tickets or drop them. If there are zero findings, skip this step entirely. (HIGH-severity findings from `code-review` are now advisory per the Severity Policy in Phase 2 — they accumulate here alongside MEDIUM/LOW rather than blocking the loop.)
 
 Format:
 
 ```
 ## Non-Blocking Suggestions ([N] item[s])
 
-1. [MEDIUM] <file:line> — <one-line description>
-2. [LOW]    <file:line> — <one-line description>
+1. [HIGH]   <file:line> — <one-line description>
+2. [MEDIUM] <file:line> — <one-line description>
+3. [LOW]    <file:line> — <one-line description>
 …
 
 Reply with the items to file as tickets (e.g. "1, 3" or "all"), or "skip" to drop them.
@@ -316,7 +405,7 @@ Reply with the items to file as tickets (e.g. "1, 3" or "all"), or "skip" to dro
 
 This applies in **both interactive and headless mode** — one prompt per ticket, posted at QA handoff, before step 3. It's the only user interaction Phase 4 requires.
 
-For each item the user elects to file, call the [/add-ticket](../skills/add-ticket/SKILL.md) skill with `category=chore`, `priority=low` (or `medium` if the original finding was MEDIUM), and a description that includes the file, line, and originating ticket id. Items the user skips are dropped — there is no persistent ledger.
+For each item the user elects to file, call the [/add-ticket](../skills/add-ticket/SKILL.md) skill with `category=chore`, priority matching the original finding's severity (`high`, `medium`, or `low`), and a description that includes the file, line, and originating ticket id. Items the user skips are dropped — there is no persistent ledger.
 
 Use the Supabase MCP tools (`mcp__claude_ai_Supabase__execute_sql`) for all ticket reads/writes. Schema and conventions live in [.claude/assets/ticket-system/](../assets/ticket-system/) — see that README for the metadata namespace and status transitions.
 
@@ -339,6 +428,12 @@ WHERE id = '<this-ticket-id>';
 
 The checklist markdown should start with `## QA Testing Checklist` and use `- [ ]` boxes organized by feature area, derived from the plan's Verification section + any edge cases surfaced during review. Never written into `tickets.description`. This step is mandatory and automatic — do not wait for the user to ask for it.
 
+### Step 4: Clean up the rubric scratch file
+
+Delete `.claude/.tmp/rubric-<ticket-id-lower>.md` from the working tree. The durable copy in `metadata.rubric` is preserved for posterity (and for any project-specific tooling that wants to inspect rubric history). The scratch file's only purpose was the evaluator gate, which has now run.
+
+If the file is missing (already deleted, or the gate was skipped per the rubric-skip rule), proceed silently — this is a best-effort cleanup, not a precondition.
+
 ## Phase 5: Ship (user-triggered only)
 
 **This phase activates ONLY when the user explicitly signals QA has passed.** Trigger phrases: "QA passed", "ship it", "looks good, push it", "ready to merge", or similar.
@@ -356,6 +451,8 @@ When triggered:
      - `tdd_elite_invoked`: boolean — was the contract-first path taken?
      - `data_gate`: `skipped` | `approved` | `remediated_N` (N = remediation rounds).
      - `security_gate`: `secure` | `remediated_N`.
+     - `outcome_gate`: `passed` | `remediated_N` (N = revision rounds before pass) | `plan_gap_halted` | `skipped` (only when no executable code).
+     - `rubric_pass_count`: e.g. `"8/8"` — final pass count from the evaluator's last run.
      - `blocked_events`: list of `{when, reason}` if `STATUS: BLOCKED` ever fired.
      - `mode`: `interactive` | `headless`.
    - **Diff telemetry** (one shell call, capture stdout):
@@ -418,7 +515,9 @@ When triggered:
          "elite_gate": "passed",
          "tdd_elite_invoked": false,
          "data_gate": "skipped",
-         "security_gate": "secure"
+         "security_gate": "secure",
+         "outcome_gate": "passed",
+         "rubric_pass_count": "8/8"
        },
        "blocked_events": []
      }

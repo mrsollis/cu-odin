@@ -8,7 +8,7 @@ version: 1.0.0
 
 Dispatcher / queue runner for the project's `public.tickets` table. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in. Ticket ids follow the canonical `T-<N>` format assigned by the database (`next_ticket_id()`).
 
-This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the full pipeline (UX → planning → coder/review loop with elite gate → data gate → security gate → QA handoff). The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, parallel collision avoidance, and end-of-run cleanup.
+This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the full pipeline (UX → planning + rubric → coder/review loop with elite gate → data gate → security gate → outcome gate → QA handoff). The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, parallel collision avoidance, and end-of-run cleanup.
 
 ## Prime directive
 
@@ -306,7 +306,7 @@ SET metadata = jsonb_set(
 WHERE id = '<id>';
 ```
 
-Use this only when context genuinely needs to be shared between agents or with a future session. Most run state already lives in `metadata.locked_tests`, `metadata.qa`, `metadata.outcome`, and `metadata.telemetry`.
+Use this only when context genuinely needs to be shared between agents or with a future session. Most run state already lives in `metadata.locked_tests`, `metadata.rubric`, `metadata.qa`, `metadata.outcome`, and `metadata.telemetry`.
 
 ### Update files_affected mid-flight
 
@@ -407,6 +407,7 @@ SELECT * FROM public.tickets WHERE id = '<id>';
 SELECT metadata->'outcome'      AS outcome,
        metadata->'telemetry'    AS telemetry,
        metadata->'qa'           AS qa,
+       metadata->'rubric'       AS rubric,
        metadata->'locked_tests' AS locked_tests,
        metadata->'comments'     AS comments
 FROM public.tickets WHERE id = '<id>';
