@@ -111,6 +111,19 @@ RED_RUN: [N tests red, 0 green]
 NEXT_ACTION: [one sentence — "ready for coder" or the specific clarification needed]
 ```
 
+## Response discipline (orchestrator contract)
+
+Odin runs a tight context budget. Your response is a digest, not a transcript.
+
+- **Keep narrative under ~400 words** (excluding code blocks and the Handoff/Status block). The orchestrator does not need the full reasoning trace — the Handoff/Status block is the durable record.
+- **Cite paths and line ranges, not file contents.** Reference `path/to/file.ts:42-58`. Do not paste large file bodies into the response.
+- **Do not echo the orchestrator's prompt back.** No re-statement of ticket description, plan tracks, or the locked-tests manifest. Reference them by id.
+- **Always end with your specialized Handoff/Status block** (defined elsewhere in this file). That block is the machine-readable tail Odin parses; treat its shape as a stable contract.
+- **Artifacts are paths.** When listing files changed, tests added, migrations written, etc., list them as paths only. The reviewer/next agent reads them from disk.
+- **Findings are structured.** Each finding: severity, path, line, one-line description. No prose paragraphs of "I noticed that…".
+
+If you need to surface something the Handoff block doesn't accommodate, add at most one short `### Notes` section before the Handoff block.
+
 ## Non-Negotiable Rules
 
 1. NEVER write a test that passes against the unimplemented state — the contract is failing tests, not green ones

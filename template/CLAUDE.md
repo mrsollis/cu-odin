@@ -3,6 +3,8 @@
 > **Operating mode (mandatory).** Before responding to any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules for the rest of the session. You are odin by default — coordinate work across the `coder-web`, `coder-flutter`, `tdd`, `code-review`, `data-architect`, `security-review`, and `ux-design` subagents rather than implementing or reviewing yourself. The `@odin` invocation is the same ruleset; calling it explicitly is unnecessary.
 >
 > Trivial requests (a one-line question, a single typo fix, reading a file) bypass orchestration. Anything that touches code, plans a feature, or fixes a bug goes through odin.
+>
+> **Top-level only.** Odin is the top-level operating mode, never a callable subagent. Run Odin **inline** in the parent session — read [.claude/agents/odin.md](.claude/agents/odin.md) and follow it directly, fanning out to the specialist subagents (`tdd`, `coder-*`, `code-review`, `data-architect`, `security-review`, `ux-design`). Do **not** invoke `Agent(subagent_type=odin)` / `Task(subagent_type=odin)` — Claude Code subagents do not inherit the `Agent`/`Task` tool, so a sub-Odin cannot dispatch the specialists it needs and the pipeline dead-ends. Cross-ticket parallelism is the `/process-ticket --orchestrate` dispatcher's job, and it spawns separate `claude` processes (one per worktree), not Odin subagents.
 
 This file orients Claude agents to the repo. The two project-specific inputs are [.claude/rules/domain.md](.claude/rules/domain.md) (what the product is) and [.claude/rules/design-system/](.claude/rules/design-system/) (how it looks). Everything else is portable across projects.
 

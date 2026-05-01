@@ -46,7 +46,7 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 | `locked_tests` | Phase 1.5 — TDD locks the test contract | `{ files: [{path, sha256}], coverage: [{ac, file}], locked_at }` | ✗ reserved |
 | `qa` | Phase 4 — QA handoff | `{ checklist: "<markdown>", posted_at }` | ✗ reserved |
 | `outcome` | Phase 5 — ship | markdown string ("what changed" summary) | ✗ reserved |
-| `telemetry` | Phase 5 — ship | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes, blocked events) | ✗ reserved |
+| `telemetry` | Phase 5 — ship; `/process-ticket` on harness halt | run-telemetry block (mode, completed_at, duration, diff stats, per-track iterations, gate outcomes, blocked events). Also carries `telemetry.harness_halts: [{ when, cause, detail, worktree }]` — appended by the dispatcher when a ticket is unclaimed because the harness itself failed (sub-process crashed, `STATUS: HARNESS_ERROR`, stale heartbeat, `claude` CLI unavailable). Distinct from `blocked_reason`, which records work-blocks on still-active tickets. | ✗ reserved |
 | `cancellation` | `/process-ticket` cancel | `{ reason, when }` | ✗ reserved |
 | `comments` | Any phase — append-only inter-agent context, used sparingly since most run state has a dedicated key | array of `{ author, when, body }` | ✗ reserved |
 
