@@ -8,7 +8,7 @@ version: 2.0.0
 
 Dispatcher / queue runner for the project's `public.tickets` table. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in. Ticket ids follow the canonical `T-<N>` format assigned by the database (`next_ticket_id()`).
 
-This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the full pipeline (UX → planning → TDD → coder/review loop with elite gate → data gate → security gate → QA handoff). The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, and end-of-run cleanup.
+This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the conditional pipeline (planning → activated-gates set per scope → coder/review loop with elite gate → QA handoff). Gates that don't match the planned scope are skipped — see odin.md for the trigger table. The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, and end-of-run cleanup; gate decisions live in odin.
 
 The orchestrate path (`--orchestrate N`) runs the cohort **in-session** — parent Odin holds N tickets in working memory and dispatches specialists via `Task` (one specialist call per ticket per phase, all parallel calls in a single message). There are no `claude` CLI subprocesses, no nested sub-Odins, no status-file polling.
 
