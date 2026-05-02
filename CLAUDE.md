@@ -34,6 +34,8 @@ CLAUDE.md
     └── ticket-system/           # Supabase ticket-table schema (replaces Linear/Jira)
 ```
 
+The installer detects `package.json` or `pubspec.yaml` and only copies the coder file you actually need (`coder-web` for web, `coder-flutter` for Flutter, both for fullstack repos).
+
 Stack is auto-detected from the repo: `package.json` → web track, `pubspec.yaml` → Flutter track.
 
 ## How odin works
@@ -41,19 +43,29 @@ Stack is auto-detected from the repo: `package.json` → web track, `pubspec.yam
 For any non-trivial request, odin runs a multi-phase loop without you needing to invoke it explicitly:
 
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
-2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
+2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Odin authors a flat list of acceptance criteria into `metadata.acceptance_criteria`; this is what `tdd` anchors locked tests to and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
 3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 into the ticket's `metadata.locked_tests`. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
-4. **Phase 2 — Coder ↔ reviewer loop** per track. Up to 2 sonnet rounds. If still stuck *and* the failure mode is reasoning depth (not spec ambiguity), escalates to the opus elite pair for up to 2 more rounds. Hard cap of 4 total iterations per track. If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
+4. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **4 total attempts per track** (2 sonnet, then up to 2 opus elite if the elite-escalation gate passes). If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
 5. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
-6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files.
-7. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` alongside structured run telemetry in `metadata.telemetry`.
+6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 4-attempt cap.
+7. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` (authored by odin from the run transcripts) alongside structured run telemetry in `metadata.telemetry`.
 8. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
+
+### Context-light specialist briefs
+
+Odin reads `CLAUDE.md`, `domain.md`, and `design-system/` once at session start, then passes each specialist subagent a slim **task-scoped brief** instead of letting them re-read the corpus. A `coder-web` brief is typically a few hundred tokens of structured context (task scope, acceptance criteria, relevant design rules, locked-tests manifest, stack, ticket id, worktree path) — not the 2,000+ lines specialists used to reload on every spawn. If a specialist needs context the brief doesn't carry, it returns `STATUS: NEEDS_BRIEF_EXPANSION` so odin can re-brief; specialists never read the corpus to fill the gap.
+
+Direct invocations (`@coder-web`, `@code-review`, etc.) still bootstrap fully from `CLAUDE.md` + rules/. The brief shortcut applies only when odin is the dispatcher.
 
 ### Headless mode
 
-Include the word `headless` or `bifrost` in your request to skip the Phase 1 plan-approval gate. The plan still posts, the loop just proceeds in the same turn. **Quality gates, the elite escalation gate, security review, and the user-triggered ship phase still apply** — headless removes a workflow checkpoint, not the safety checkpoints.
+Include the word `headless` or `bifrost` in your request, or run with the harness's `Auto mode active` signal, to enter unattended operation. **Auto mode = zero operational prompts.** The plan still posts, but the loop proceeds without plan-approval, auto-commits each ticket as it completes, and never stops to ask for confirmation on operational decisions. **Quality, security, and elite-escalation gates still apply** — headless removes workflow checkpoints, not safety checkpoints.
 
-The Claude Code harness's own `Auto mode active` signal also triggers headless.
+One explicit exception: **a dirty working tree always prompts** (commit / stash / abort) regardless of mode. The user's uncommitted work is sacred, and the dispatcher will never silently abort or auto-clobber it.
+
+### Cohort orchestration (`/process-ticket --orchestrate N`)
+
+For multi-ticket runs, the parent Odin session manages all N tickets in-parallel itself, dispatching specialists via the `Task` tool — one specialist call per ticket per phase, run in parallel where independent. There are no `claude` CLI subprocesses, no nested sub-Odins, and no status-file polling. Each ticket gets its own git worktree under `.worktrees/<id-lower>/` so the diffs don't collide; merges back to `main` happen at user-triggered Phase 5 ship.
 
 ## Customization (the only files you need to edit)
 
