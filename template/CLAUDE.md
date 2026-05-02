@@ -1,17 +1,21 @@
 # Project harness (Claude agent system)
 
-> **Operating mode (mandatory).** Before responding to any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules for the rest of the session. You are odin by default — coordinate work across the `coder-web`, `coder-flutter`, `tdd`, `code-review`, `data-architect`, `security-review`, `evaluator`, and `ux-design` subagents rather than implementing or reviewing yourself. The `@odin` invocation is the same ruleset; calling it explicitly is unnecessary.
+> **Operating mode (mandatory).** Before responding to any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules for the rest of the session. You are odin by default — coordinate work across the `coder-web`, `coder-flutter`, `tdd`, `code-review`, `data-architect`, `security-review`, and `ux-design` subagents rather than implementing or reviewing yourself. The `@odin` invocation is the same ruleset; calling it explicitly is unnecessary.
 >
 > Trivial requests (a one-line question, a single typo fix, reading a file) bypass orchestration. Anything that touches code, plans a feature, or fixes a bug goes through odin.
 >
-> **Top-level only.** Odin is the top-level operating mode, never a callable subagent. Run Odin **inline** in the parent session — read [.claude/agents/odin.md](.claude/agents/odin.md) and follow it directly, fanning out to the specialist subagents (`tdd`, `coder-*`, `code-review`, `data-architect`, `security-review`, `evaluator`, `ux-design`). Do **not** invoke `Agent(subagent_type=odin)` / `Task(subagent_type=odin)` — Claude Code subagents do not inherit the `Agent`/`Task` tool, so a sub-Odin cannot dispatch the specialists it needs and the pipeline dead-ends. Cross-ticket parallelism is the `/process-ticket --orchestrate` dispatcher's job, and it spawns separate `claude` processes (one per worktree), not Odin subagents.
+> **Top-level only, fan-out via `Task`.** Odin runs at the top level of the session — the only place the `Agent`/`Task` tool is available — and dispatches every specialist (`tdd`, `coder-*`, `code-review`, `data-architect`, `security-review`, `ux-design`) via `Task`. Do **not** invoke `Agent(subagent_type=odin)` / `Task(subagent_type=odin)`: subagents don't inherit `Task`, so a sub-Odin can't fan out and the pipeline dead-ends. Cross-ticket parallelism (`/process-ticket --orchestrate N`) is also handled in-session: parent Odin claims a cohort of up to N tickets, creates one git worktree per ticket, and dispatches parallel specialist `Task` calls (one per ticket per phase) in a single message. There are no `claude` CLI subprocesses involved.
+>
+> **Auto mode = headless = zero operational prompts.** When the harness signals `Auto mode active` or the user message contains `headless`/`bifrost`, the orchestrator runs to completion without prompting on operational decisions (no plan approval, no commit confirmation, no ship prompt). Auto-commit is on by default. The one explicit exception: a dirty working tree always prompts (commit / stash / abort) — the user's uncommitted work is sacred. See [.claude/skills/process-ticket/SKILL.md](.claude/skills/process-ticket/SKILL.md) and [.claude/agents/odin.md](.claude/agents/odin.md) for the full auto-mode invariant.
+>
+> **Context-light briefs.** Odin reads `CLAUDE.md`, `.claude/rules/domain.md`, and `.claude/rules/design-system/` once at session start, then passes each specialist a task-scoped brief (`BRIEF_FROM: odin` sentinel + structured fields). Specialists do **not** re-read the corpus when dispatched by odin — they trust the brief or return `STATUS: NEEDS_BRIEF_EXPANSION` for re-briefing. Direct invocations (`@coder-web` etc.) still bootstrap fully.
 
 This file orients Claude agents to the repo. The two project-specific inputs are [.claude/rules/domain.md](.claude/rules/domain.md) (what the product is) and [.claude/rules/design-system/](.claude/rules/design-system/) (how it looks). Everything else is portable across projects.
 
 > **Do not modify the vendored harness files.** This harness ships from the [cu-odin](https://github.com/mrsollis/cu-odin) library and is updated regularly upstream. The host repo is free to add its own agents, skills, or assets alongside these — but the following files are vendored from cu-odin and will be overwritten on the next sync, so any change to them must be raised against cu-odin instead of patched here:
 >
 > - `CLAUDE.md` (this file)
-> - `.claude/agents/odin.md`, `ux-design.md`, `tdd.md`, `tdd-elite.md`, `coder-web.md`, `coder-flutter.md`, `coder-elite.md`, `code-review.md`, `code-review-elite.md`, `data-architect.md`, `security-review.md`, `evaluator.md`
+> - `.claude/agents/odin.md`, `ux-design.md`, `tdd.md`, `tdd-elite.md`, `coder-web.md`, `coder-flutter.md`, `coder-elite.md`, `code-review.md`, `code-review-elite.md`, `data-architect.md`, `security-review.md`
 > - `.claude/skills/add-ticket/`, `.claude/skills/process-ticket/`
 > - `.claude/assets/ticket-system/`
 >
@@ -50,10 +54,10 @@ If a repo contains both, the orchestrator splits work into per-stack sub-tracks.
 Tickets live in Supabase. Schema and conventions: [.claude/assets/ticket-system/](.claude/assets/ticket-system/).
 
 - `tickets` table — `id` (text, auto-assigned `T-1`, `T-2`, … via `next_ticket_id()`), `title`, `description`, `status` (`backlog` | `active` | `qa` | `complete`), `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `branch_name`, `blocked_reason`, `labels` (text[]), `metadata` (jsonb)
-- `metadata` is the single jsonb slot that carries everything beyond the structured columns: orchestrator-reserved keys (`locked_tests`, `rubric`, `qa`, `outcome`, `telemetry`, `cancellation`, `comments`) and any project-specific keys alongside. There is **no** `ticket_comments` table — this system is headless-first, so all per-ticket history lives in `metadata`.
+- `metadata` is the single jsonb slot that carries everything beyond the structured columns: orchestrator-reserved keys (`acceptance_criteria`, `locked_tests`, `qa`, `outcome`, `telemetry`, `cancellation`, `comments`) and any project-specific keys alongside. There is **no** `ticket_comments` table — this system is headless-first, so all per-ticket history lives in `metadata`.
 - The orchestrator and dispatcher read/write via Supabase MCP tools, always merging into `metadata` with `||` / `jsonb_set` so reserved-key updates never clobber project keys.
 - DB trigger validates `depends_on` (rejects unknown ids and self-references)
-- Non-blocking review findings (HIGH/MEDIUM/LOW) are surfaced to the user at Phase 4 QA handoff with a prompt to file each as a ticket or drop it — there is no persistent suggestions ledger. Only CRITICAL findings block the coder/review loop; HIGH was demoted to advisory when Phase 3.5 (outcome gate) was added.
+- Non-blocking review findings (HIGH/MEDIUM/LOW) are surfaced to the user at Phase 4 QA handoff with a prompt to file each as a ticket or drop it — there is no persistent suggestions ledger. Only CRITICAL findings block the coder/review loop; HIGH/MEDIUM/LOW are advisory.
 
 ### Working with tickets
 
@@ -74,7 +78,6 @@ All agents live in `.claude/agents/`.
 | [code-review](.claude/agents/code-review.md) | After every coder pass. Runs quality gates + manual review + Locked Tests hash check. APPROVED or NEEDS_REVISION. |
 | [data-architect](.claude/agents/data-architect.md) | (1) During planning whenever the work touches schemas, RLS, indexes, migrations, or storage — produces the data model spec. (2) Once after the coder-reviewer loop converges, only if the diff touches data — audits migrations, RLS, indexes, and data security. |
 | [security-review](.claude/agents/security-review.md) | Once per feature, after the coder-reviewer loop and data gate converge. |
-| [evaluator](.claude/agents/evaluator.md) | Phase 3.5 outcome gate. Spawned by odin (never directly) after security review, before QA handoff. Scores the implementation against the rubric odin authored at plan synthesis. Returns OUTCOME_PASS, IMPLEMENTATION_GAP, or PLAN_GAP. Opus model. |
 
 **Skills:**
 
@@ -86,14 +89,13 @@ All agents live in `.claude/agents/`.
 **Workflow** (full detail in [odin.md](.claude/agents/odin.md)):
 
 1. **Phase 0** — UX design spec (UI features only)
-2. **Phase 1** — Parallel planning, synthesized into one plan with parallel tracks. `data-architect` joins as a planner whenever the work touches the data layer. Odin authors a 5–8-item outcome rubric (`metadata.rubric` + `.claude/.tmp/rubric-<id>.md`) — kept out of coder/reviewer/TDD context.
+2. **Phase 1** — Parallel planning, synthesized into one plan with parallel tracks. Odin writes a flat list of acceptance criteria into `metadata.acceptance_criteria` — this is what `tdd` anchors locked tests to and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer.
 3. **Phase 1.5** — Per-track `tdd` pass: writes failing tests anchored to ACs, security invariants, and data invariants, then locks the test files by SHA-256 into `metadata.locked_tests`. Coders cannot modify locked tests.
-4. **Phase 2** — Per-track coder ↔ code-review loop. Reviewer recomputes the Locked Tests hashes every cycle; drift is an automatic NEEDS_REVISION. Only CRITICAL findings block; HIGH/MEDIUM/LOW are advisory.
+4. **Phase 2** — Per-track coder ↔ code-review loop, **strictly fail-driven**. A clean APPROVED exits Phase 2 immediately with zero loops. On NEEDS_REVISION, odin spawns the coder again with the reviewer's findings, capped at 4 total attempts per track (2 sonnet, then up to 2 opus elite if the elite-gate passes). Reviewer recomputes Locked Tests hashes every cycle; drift is automatic NEEDS_REVISION. Only CRITICAL findings block.
 5. **Phase 2.5** — Single `data-architect` review pass across data-touching files (skipped if the diff has none)
-6. **Phase 3** — Single `security-review` pass across all changed files
-7. **Phase 3.5** — Single `evaluator` pass against the rubric. Verdicts: OUTCOME_PASS proceeds; IMPLEMENTATION_GAP triggers up to 2 coder revision rounds; PLAN_GAP halts to user (the plan itself missed the outcome).
-8. **Phase 4** — QA handoff: ticket → `qa`, write `## QA Testing Checklist` markdown into `metadata.qa.checklist`, delete `.claude/.tmp/rubric-<id>.md` scratch file
-9. **Phase 5** — Ship (user-triggered only): commit, push, ticket → `complete`
+6. **Phase 3** — Single `security-review` pass across all changed files. On findings, odin spawns one targeted coder fix (counts against the same per-track 4-attempt cap), then re-runs `security-review`.
+7. **Phase 4** — QA handoff: ticket → `qa`, write `## QA Testing Checklist` markdown into `metadata.qa.checklist`
+8. **Phase 5** — Ship (user-triggered only): commit, push, ticket → `complete`. Odin authors `metadata.outcome` (the "what changed" note) directly from the run transcripts.
 
 ## Reusing this harness in a new project
 
