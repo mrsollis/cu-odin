@@ -42,16 +42,22 @@ main().catch((err) => {
 async function main() {
   console.log(`\ncu-odin: installing harness into ${targetDir}\n`);
 
-  const stack = detectStack(targetDir);
-  if (stack.web && stack.flutter) {
-    console.log(`  Detected stack: fullstack (web + flutter) — installing both coder agents.\n`);
-  } else if (stack.web) {
-    console.log(`  Detected stack: web (package.json present) — installing coder-web only.\n`);
-  } else if (stack.flutter) {
-    console.log(`  Detected stack: flutter (pubspec.yaml present) — installing coder-flutter only.\n`);
+  const detected = detectStack(targetDir);
+  const detectedDefault = detected.web && !detected.flutter
+    ? "nextjs"
+    : detected.flutter && !detected.web
+      ? "flutter"
+      : null;
+  if (detectedDefault) {
+    console.log(`  Detected stack: ${detectedDefault === "nextjs" ? "web (package.json present)" : "flutter (pubspec.yaml present)"}.\n`);
+  } else if (detected.web && detected.flutter) {
+    console.log(`  Detected stack: fullstack (both package.json and pubspec.yaml present).\n`);
   } else {
-    console.log(`  No stack detected (no package.json or pubspec.yaml). Installing both coders so you can choose later.\n`);
+    console.log(`  No stack detected (no package.json or pubspec.yaml).\n`);
   }
+
+  const stack = await promptStack(detectedDefault);
+  console.log(`  Installing coder + coder-elite for: ${stack}\n`);
 
   // Categories the user gets to decide on, plus ticket assets which copy-if-missing
   // without prompting (versioned schema, no per-project edits).
@@ -129,18 +135,40 @@ function detectStack(dir) {
   };
 }
 
-// Filter agent files by detected stack. Web-only repos skip coder-flutter; Flutter-only
-// repos skip coder-web. Repos with neither (or both) get the full set so the user can
-// pick later. coder-elite, the *-elite agents, and stack-agnostic agents (tdd, ux-design,
-// data-architect, security-review, code-review, odin) always install.
+// Filter agent files by chosen stack ("nextjs" or "flutter"). Only the coder for the
+// chosen stack is installed. coder-elite is shared across stacks and always installs,
+// alongside the other stack-agnostic agents (tdd, ux-design, data-architect,
+// security-review, code-review, odin).
 function agentForStack(rel, stack) {
-  const fullstackOrUnknown = (stack.web && stack.flutter) || (!stack.web && !stack.flutter);
-  if (fullstackOrUnknown) return true;
-
   const filename = path.basename(rel);
-  if (filename === "coder-web.md") return stack.web === true;
-  if (filename === "coder-flutter.md") return stack.flutter === true;
+  if (filename === "coder-web.md") return stack === "nextjs";
+  if (filename === "coder-flutter.md") return stack === "flutter";
   return true;
+}
+
+async function promptStack(detectedDefault) {
+  const def = detectedDefault || "nextjs";
+
+  if (acceptDefaults || !process.stdin.isTTY) {
+    console.log(`  Stack: ${def} (default)`);
+    return def;
+  }
+
+  const answer = await promptText(`  Is this project Next.js or Flutter? [nextjs/flutter] (default: ${def}) `);
+  const trimmed = answer.trim().toLowerCase();
+  if (["nextjs", "next.js", "next", "web", "n"].includes(trimmed)) return "nextjs";
+  if (["flutter", "f"].includes(trimmed)) return "flutter";
+  return def;
+}
+
+function promptText(question) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
 }
 
 function groupExists(group) {
