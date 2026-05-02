@@ -83,10 +83,28 @@ async function main() {
         rel.startsWith(path.join(".claude", "rules", "design-system") + path.sep)
       ),
     },
+    rulesHarness: {
+      // Vendored rules files referenced by CLAUDE.md / odin.md (ticket schema, harness
+      // reuse instructions). Treated like agents: overwrite by default on re-install.
+      label: ".claude/rules/ (vendored)",
+      files: collectFiles((rel) => {
+        const harnessRulesDir = path.join(".claude", "rules") + path.sep;
+        if (!rel.startsWith(harnessRulesDir)) return false;
+        if (rel === path.join(".claude", "rules", "domain.md")) return false;
+        if (rel.startsWith(path.join(".claude", "rules", "design-system") + path.sep)) return false;
+        return true;
+      }),
+    },
     tickets: {
       label: ".claude/assets/ticket-system/",
       files: collectFiles((rel) =>
         rel.startsWith(path.join(".claude", "assets", "ticket-system") + path.sep)
+      ),
+    },
+    benchmarks: {
+      label: ".claude/assets/benchmarks/",
+      files: collectFiles((rel) =>
+        rel.startsWith(path.join(".claude", "assets", "benchmarks") + path.sep)
       ),
     },
     skills: {
@@ -107,8 +125,10 @@ async function main() {
   applyGroup(groups.agents, decisions.agents, created, overwritten, skipped);
   applyGroup(groups.domain, decisions.domain, created, overwritten, skipped);
   applyGroup(groups.designSystem, decisions.designSystem, created, overwritten, skipped);
+  applyGroup(groups.rulesHarness, decisions.rulesHarness, created, overwritten, skipped);
   applyGroup(groups.skills, decisions.skills, created, overwritten, skipped);
   applyGroup(groups.tickets, decisions.tickets, created, overwritten, skipped);
+  applyGroup(groups.benchmarks, decisions.benchmarks, created, overwritten, skipped);
 
   printSummary({ created, overwritten, skipped });
 }
@@ -214,6 +234,26 @@ async function promptDecisions(groups) {
     exists: dsExists,
     questionExists: "Replace the existing design-system/ with the placeholder stub? (this will overwrite your design system docs)",
     questionMissing: "Stub in design-system/?",
+    defaultIfExists: false,
+    defaultIfMissing: true,
+  });
+
+  const rulesHarnessExists = groupExists(groups.rulesHarness);
+  decisions.rulesHarness = await ask({
+    label: groups.rulesHarness.label,
+    exists: rulesHarnessExists,
+    questionExists: "Overwrite the vendored rules files (ticket-schema.md, harness-reuse.md) with the latest from this cu-odin release?",
+    questionMissing: "Install vendored rules files (ticket-schema.md, harness-reuse.md)?",
+    defaultIfExists: false,
+    defaultIfMissing: true,
+  });
+
+  const benchmarksExists = groupExists(groups.benchmarks);
+  decisions.benchmarks = await ask({
+    label: groups.benchmarks.label,
+    exists: benchmarksExists,
+    questionExists: "Overwrite the benchmarks recipe with the latest from this cu-odin release?",
+    questionMissing: "Install benchmarks recipe?",
     defaultIfExists: false,
     defaultIfMissing: true,
   });
