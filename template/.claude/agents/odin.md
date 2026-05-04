@@ -221,7 +221,7 @@ Triggered by "QA passed" / "ship it" / "looks good" / pre-authorized auto-mode p
 
 1. Commit (auto-generated conventional message in auto mode).
 2. Push.
-3. Capture run + diff telemetry (`git diff --shortstat main...HEAD`, `git diff --name-only`, `git rev-parse --short HEAD`, `git log -1 --pretty=%s`, plus your in-memory gate state).
+3. Capture run + diff telemetry (`git diff --shortstat main...HEAD`, `git diff --name-only`, `git rev-parse --short HEAD`, `git log -1 --pretty=%s`, plus your in-memory gate state). The dispatcher (`/process-ticket`) supplies `started_at`, `completed_at`, `duration_seconds`, `tokens` (input/output/cache + per-agent breakdown), and `context` (model window, dispatcher peak, per-agent peaks, compactions) — merge those into the same telemetry payload. Do not try to compute them yourself; only the dispatcher sees the full ticket lifespan and every `Task` usage record.
 4. Author the outcome note from run transcripts (format in [.claude/rules/ticket-schema.md](../rules/ticket-schema.md)).
 5. Single UPDATE: `status = 'complete'`, clear `assigned_to/at`, `branch_name`, `blocked_reason`, merge `outcome` and `telemetry` into `metadata`. SQL template: [.claude/rules/ticket-schema.md](../rules/ticket-schema.md).
 6. Report any downstream tickets (those with this id in `depends_on`) now ready.

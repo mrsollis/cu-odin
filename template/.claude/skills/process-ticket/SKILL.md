@@ -177,6 +177,28 @@ Repeat until the queue is empty OR fewer than 1 ticket is ready (in `--loop`, ke
 
 6. **Wait for the cohort** to all reach Phase 4 (or fail/block), apply per-ticket commit policy as each finishes, then go to step 1.
 
+### Telemetry capture (dispatcher-owned)
+
+The dispatcher owns run-clock and token-cost telemetry because it is the only context that sees the full lifespan of the ticket — from claim through Phase 5 ship — and that observes every `Task` dispatch's usage data. Odin trusts these numbers from the dispatcher; do not have specialists self-report.
+
+Track per ticket, in working memory across the run:
+
+- `started_at` — wall-clock ISO timestamp captured at the moment the atomic claim SQL returns (step 3 of the no-args path; the per-ticket claim in cohort mode). Use the DB `assigned_at` if you also want a server-clock anchor.
+- `completed_at` — wall-clock ISO timestamp captured immediately before the Phase 5 final UPDATE.
+- `duration_seconds` — `completed_at − started_at`, integer seconds. In cohort mode this is the per-ticket span, not the cohort wall-clock.
+- `tokens` — sum of usage across every `Task` dispatch made on behalf of this ticket. Each `Task` tool result reports usage; accumulate `input_tokens`, `output_tokens`, `cache_read_input_tokens`, and `cache_creation_input_tokens` per call. Maintain a per-agent breakdown (`tokens.by_agent`) keyed by `subagent_type`, with `{ input, output, calls }` (and cache fields when present). The dispatcher's own model turns are not included — only spend driven by the ticket's specialist dispatches. In cohort mode, attribute each `Task` to the ticket whose brief it carried.
+- `context` — context-window pressure across the run. Distinct from `tokens` (cost) — this is "how full did the window get." Track:
+  - `model_window` — the active model's max input context (e.g. `1000000` for Opus 4.7 1M).
+  - `dispatcher_peak` / `dispatcher_peak_pct` — your own session's largest single-turn input-token count and its share of `model_window`. Sample after each Phase boundary; keep the max.
+  - `dispatcher_end` — input-token count on the final Phase 5 turn (useful for spotting bloated trailing context).
+  - `by_agent_peak` — per `subagent_type`, the largest `input_tokens` reported across that agent's `Task` calls plus `at_call` (1-indexed). A specialist's `input_tokens` *is* its prompt size, which is its context fill.
+  - `compactions` — count of harness-triggered compactions observed during the run (the system reminder fires when one happens; increment a counter).
+  In cohort mode, `dispatcher_peak` is shared across the cohort (one parent session) so attribute it to the ticket whose phase boundary triggered the sample, or to all cohort tickets equally — pick one rule per run and note it in `context.attribution`. Per-agent peaks are unambiguous since each `Task` carries one ticket's brief.
+
+At Phase 5, the dispatcher passes `started_at`, `completed_at`, `duration_seconds`, and `tokens` into Odin's final UPDATE so they merge into `metadata.telemetry` alongside Odin's gate/diff fields. Schema: [.claude/rules/ticket-schema.md](../../rules/ticket-schema.md).
+
+If a ticket halts before Phase 5 (BLOCKED, harness halt, cancelled), still record what you have onto `metadata.telemetry` so partial-cost data is not lost — this is one of the few cases where a non-Phase-5 telemetry write is correct.
+
 ### Per-ticket commit policy
 
 Applied after each ticket reaches QA handoff, on the ticket's branch (or worktree's branch).
