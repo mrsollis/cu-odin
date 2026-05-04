@@ -72,30 +72,13 @@ WHERE id = '<this-ticket-id>';
     "completed_at": "2026-04-29T18:22:01Z",
     "duration_seconds": 5421,
     "tokens": {
-      "input": 482301,
-      "output": 38942,
-      "cache_read": 1204588,
-      "cache_creation": 96120,
       "total": 1822951,
       "by_agent": {
-        "coder-web": { "input": 184220, "output": 19880, "calls": 3 },
-        "code-review": { "input": 142008, "output": 9011, "calls": 3 },
-        "tdd": { "input": 71044, "output": 4920, "calls": 1 },
-        "security-review": { "input": 85029, "output": 5131, "calls": 1 }
+        "coder-web":       { "total": 204100, "calls": 3 },
+        "code-review":     { "total": 151019, "calls": 3 },
+        "tdd":             { "total":  75964, "calls": 1 },
+        "security-review": { "total":  90160, "calls": 1 }
       }
-    },
-    "context": {
-      "model_window": 1000000,
-      "dispatcher_peak": 184302,
-      "dispatcher_peak_pct": 0.18,
-      "dispatcher_end": 142880,
-      "by_agent_peak": {
-        "coder-web":       { "peak": 78201, "peak_pct": 0.08, "at_call": 3 },
-        "code-review":     { "peak": 64118, "peak_pct": 0.06, "at_call": 3 },
-        "tdd":             { "peak": 71044, "peak_pct": 0.07, "at_call": 1 },
-        "security-review": { "peak": 85029, "peak_pct": 0.09, "at_call": 1 }
-      },
-      "compactions": 0
     },
     "mode": "interactive",
     "commit_sha": "a1b2c3d",
