@@ -45,9 +45,26 @@ When `LOCKED_TESTS` is in the brief, you must **not** modify any listed file: no
 
 If `CLAUDE.md` specifies different commands (melos / fvm wrapper), prefer those. If gates can't be determined, emit `STATUS: BLOCKED`. Fix everything — never leave analyzer warnings, formatter diffs, or failing tests.
 
+## Hypothesis block (iterations ≥ 2)
+
+On revision cycles — whenever `PRIOR_ITERATION_DIGEST` is present in the brief — your handoff **must** begin with an explicit `HYPOTHESIS:` block before the narrative:
+
+```
+HYPOTHESIS: The previous attempt failed AC-3 because the StreamProvider was
+rebuilt on every parent rebuild, so the listener received stale data after the
+first emission. This attempt scopes the provider to a stable parent so it isn't
+recreated, and verifies via a widget test that the second emission propagates.
+```
+
+Two sentences max: (1) why the prior attempt actually failed, (2) what this attempt does differently and why that addresses the root cause. The reviewer will judge the hypothesis independently of whether the diff passes. Do not write hypotheses you don't believe — "hypothesis theatre" gets flagged.
+
+If `PRIOR_ITERATION_DIGEST` carries a `reviewer_counter_hypothesis` from the previous cycle, you **must** address it in your hypothesis — either explain why you accept it and how this attempt acts on it, or explain why you reject it. Ignoring a prior counter-hypothesis is a CRITICAL finding.
+
 ## Handoff
 
 ```
+HYPOTHESIS: [one or two sentences — only on iterations ≥ 2]
+
 ## Handoff Status
 STATUS: COMPLETE | NEEDS_REVISION | BLOCKED
 FILES_CHANGED: [paths]
@@ -62,5 +79,7 @@ Narrative under ~400 words. Cite paths/line ranges. Don't echo the brief. Findin
 2. NEVER leave code that fails `dart format` or `flutter analyze`.
 3. NEVER use `BuildContext` after `await` without `mounted`.
 4. NEVER edit a locked test — emit `BLOCKED` with `locked_test_disputed`.
-5. ALWAYS dispose controllers, subscriptions, listeners.
-6. ALWAYS verify all gates pass before handoff.
+5. NEVER ignore a prior `reviewer_counter_hypothesis` carried in the digest — address it explicitly in your `HYPOTHESIS:`.
+6. ALWAYS dispose controllers, subscriptions, listeners.
+7. ALWAYS verify all gates pass before handoff.
+8. On iterations ≥ 2, ALWAYS lead the handoff with a `HYPOTHESIS:` block.

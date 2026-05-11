@@ -190,9 +190,19 @@ Track per ticket, in working memory across the run:
 
 > **What the dispatcher can actually read.** The harness surfaces `total_tokens` per `Task` result and nothing finer-grained — there is no reliable way to read `input_tokens` / `output_tokens` / `cache_read_input_tokens` / `cache_creation_input_tokens` from a `Task` result, and no first-class API for "what is my own current turn's input-token count." A four-way split + dispatcher-context-fill block is therefore **not** required of the dispatcher. If a future harness change exposes those values, re-spec this section with a worked reference impl in the skill before adding the fields back to the schema — otherwise dispatchers will silently drop them. Renderers that consume `metadata.telemetry` must treat the four-way split and the `context` block as optional; total-only is the contract.
 
-At Phase 5, the dispatcher passes `started_at`, `completed_at`, `duration_seconds`, and `tokens` into Odin's final UPDATE so they merge into `metadata.telemetry` alongside Odin's gate/diff fields. Schema: [.claude/rules/ticket-schema.md](../../rules/ticket-schema.md).
+At Phase 5, the dispatcher passes `started_at`, `completed_at`, `duration_seconds`, and `tokens` into Odin's final UPDATE so they merge into `metadata.telemetry` alongside Odin's gate/diff fields **in the same UPDATE statement that flips `status` to `complete`** — see Phase-5 atomicity below. Schema: [.claude/rules/ticket-schema.md](../../rules/ticket-schema.md).
 
 If a ticket halts before Phase 5 (BLOCKED, harness halt, cancelled), still record what you have onto `metadata.telemetry` so partial-cost data is not lost — this is one of the few cases where a non-Phase-5 telemetry write is correct.
+
+### Phase-5 atomicity (load-bearing invariant)
+
+`status = 'complete'`, `metadata.outcome`, and `metadata.telemetry` MUST be set in a **single UPDATE statement**. Splitting them is a bug. Repo-specific DB-side triggers fire once on the status flip and snapshot `metadata` at that instant — telemetry or outcome written in a follow-up UPDATE is invisible to the user-facing completion message and any downstream consumers.
+
+Dispatcher contract:
+
+- **Hand telemetry to Odin _before_ Odin issues the Phase-5 UPDATE**, never after. The dispatcher's `started_at` / `completed_at` / `duration_seconds` / `tokens` payload must be in Odin's working memory when it builds the UPDATE.
+- If telemetry is unavailable at the moment of completion (e.g., the dispatcher crashed mid-cohort and is recovering), fold whatever partial telemetry exists into the same UPDATE that flips `status` — make that the telemetry write — and record the gap inside the `telemetry` jsonb. **Never** issue a second UPDATE to "patch in" telemetry or outcome after status has flipped.
+- Odin runs a pre-flight assertion before the UPDATE (see [odin.md](../../agents/odin.md) Phase 5) and a post-write read-back after. Both can emit `STATUS: PHASE_5_PRECONDITIONS_MISSING` or `STATUS: PHASE_5_CORRUPT_COMPLETION` — surface either to the user; do not silently retry. Downstream gates may cite "Phase-5 atomicity violated" when this is breached.
 
 ### Per-ticket commit policy
 

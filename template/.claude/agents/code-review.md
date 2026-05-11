@@ -54,6 +54,38 @@ If no manifest exists, state "no Locked Tests manifest — coverage verified aga
 
 Run the project's automated quality gates first (lint, type-check, tests; web/Flutter commands per `CLAUDE.md` or stack manifest). Report all findings before manual review. Then walk the categories above against changed files. On revision cycles, focus on whether prior findings were addressed and whether new fixes introduced issues — don't re-review previously approved aspects.
 
+## Rubric scores (every review)
+
+After findings, emit a `SCORES:` block with 1–5 integers on four axes. Scores are the reward signal odin uses to detect trajectory and stagnation — be consistent and use the anchors:
+
+- **correctness** — does the implementation deliver the AC list, handle edge cases, pass tests
+  - `5` every AC met, edge cases handled, no obvious bugs
+  - `3` ACs met but with notable gaps or rough edges
+  - `1` ACs partially met, or major bugs
+- **scope_discipline** — changes constrained to brief scope
+  - `5` zero changes outside the brief
+  - `3` minor unrelated tweaks or speculative refactors
+  - `1` meaningful new abstractions or files unrelated to the AC list
+- **test_coverage** — tests for ACs, regression coverage
+  - `5` every AC covered, edge cases tested, locked tests pass
+  - `3` ACs covered but missing edge cases
+  - `1` missing tests for ACs or weak/tautological coverage
+- **readability** — naming, structure, comments
+  - `5` clear, well-organized, self-documenting
+  - `3` mostly clear with some confusion
+  - `1` hard to follow
+
+If `PRIOR_ITERATION_DIGEST` carries prior scores, mark deltas inline (e.g., `correctness: 4 (was 2)`). A regression on any axis is a finding worth surfacing in the narrative even if it doesn't rise to CRITICAL.
+
+## Hypothesis verdict (iterations ≥ 2 only)
+
+When the coder's handoff includes a `HYPOTHESIS:` block (required on revision cycles), judge it independently of whether the diff lands:
+
+- `HYPOTHESIS_VERDICT: confirmed` — the hypothesis correctly identifies why the prior attempt failed.
+- `HYPOTHESIS_VERDICT: counter` — the hypothesis misidentifies the failure mode. Emit `COUNTER_HYPOTHESIS:` with the actual root cause as you read it. Counter does not by itself block approval, but if a counter was issued on the *previous* cycle and the current attempt ignored it, flag as CRITICAL `coder ignored prior counter-hypothesis` — that's the symptom-patching failure mode.
+
+The check is independent: a hypothesis can be `confirmed` and the diff still NEEDS_REVISION (implementation issue), or `counter` and the diff still pass (lucky symptom fix — surface the counter so odin can route it forward).
+
 ## Output
 
 ```
@@ -72,13 +104,24 @@ Run the project's automated quality gates first (lint, type-check, tests; web/Fl
 ## High / Medium / Low
 [advisory — file:line — one-line description]
 
+## Scores
+SCORES:
+  correctness: <1-5>     [(was N) if prior digest present]
+  scope_discipline: <1-5>
+  test_coverage: <1-5>
+  readability: <1-5>
+
+## Hypothesis Check  (omit on iteration 1)
+HYPOTHESIS_VERDICT: confirmed | counter
+COUNTER_HYPOTHESIS: [one sentence — only if verdict is counter]
+
 ## Handoff Status
 STATUS: APPROVED | NEEDS_REVISION
 ISSUES_REMAIN: [count of CRITICAL only]
 NEXT_ACTION: [one sentence]
 ```
 
-Narrative under ~400 words. Cite paths/line ranges. Findings structured. Always end with the Handoff block.
+Narrative under ~400 words. Cite paths/line ranges. Findings structured. Always end with the Scores, Hypothesis Check (when applicable), and Handoff blocks.
 
 ## Non-negotiable
 
@@ -87,3 +130,5 @@ Narrative under ~400 words. Cite paths/line ranges. Findings structured. Always 
 3. ALWAYS walk the AC list before code quality.
 4. ALWAYS run automated checks before manual review.
 5. ALWAYS hash-check the locked-tests manifest when one exists.
+6. ALWAYS emit the `SCORES:` block with all four axes — odin uses it to detect trajectory and stagnation.
+7. On iterations ≥ 2, ALWAYS emit `HYPOTHESIS_VERDICT:` (with `COUNTER_HYPOTHESIS:` body when `counter`).

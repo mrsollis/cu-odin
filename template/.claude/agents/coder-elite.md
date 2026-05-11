@@ -43,9 +43,25 @@ Same as the standard coder:
 
 Stack-specific watchpoints from `coder-web.md` / `coder-flutter.md` apply — read whichever matches.
 
+## Hypothesis block (always required for elite)
+
+You are *always* on a revision cycle — elite is never iteration 1. Your handoff begins with an explicit `HYPOTHESIS:` block. Same contract as the standard coder, but two sentences max, with explicit reference to **why prior hypotheses missed**:
+
+```
+HYPOTHESIS: Attempts 1 and 2 both treated the symptom as a race in the
+cache layer, but the actual cause is that the mutation handler writes the
+wrong shape on validation failure — the cache is consistent, the source is
+not. This attempt fixes the handler and removes the cache-invalidation
+band-aids the prior attempts introduced.
+```
+
+If `PRIOR_ITERATION_DIGEST` carries a `reviewer_counter_hypothesis`, address it explicitly. If your `ROOT_CAUSE` aligns with the counter, say so; if it diverges, explain why you read the failure differently.
+
 ## Handoff
 
 ```
+HYPOTHESIS: [two sentences — reference what prior hypotheses missed]
+
 ## Handoff Status
 STATUS: COMPLETE | NEEDS_REVISION | BLOCKED
 FILES_CHANGED: [paths]
@@ -63,5 +79,7 @@ Narrative under ~400 words. Cite paths/line ranges. Always end with the Handoff 
 1. NEVER apply standard Revision-Mode narrow-patching — widen scope when root cause demands it.
 2. NEVER repeat a fix the standard coder already tried without explaining why it works this time.
 3. NEVER skip the quality gates.
-4. ALWAYS state the root cause, even when it points at a spec problem.
-5. If the spec or architecture is the blocker, emit `STATUS: BLOCKED` rather than producing a fragile workaround.
+4. NEVER ignore a `reviewer_counter_hypothesis` carried in the digest — address it in your `HYPOTHESIS:`.
+5. ALWAYS lead the handoff with a `HYPOTHESIS:` block that explains why prior hypotheses missed.
+6. ALWAYS state the root cause, even when it points at a spec problem.
+7. If the spec or architecture is the blocker, emit `STATUS: BLOCKED` rather than producing a fragile workaround.

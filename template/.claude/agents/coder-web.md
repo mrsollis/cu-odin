@@ -37,9 +37,25 @@ When `LOCKED_TESTS` is in the brief, you must **not** modify any listed file: no
 
 Detect package manager from the lockfile (`pnpm-lock.yaml`/`yarn.lock`/`bun.lockb` → otherwise npm). Run the project's scripts; conventional set: `<pm> run lint`, `<pm> run type-check` (or `tsc --noEmit`), `<pm> run test`, and for Next.js production-targeted changes `<pm> run build` (catches Server/Client component violations and serialization errors). If `CLAUDE.md` documents different commands, prefer those. If gates can't be determined, emit `STATUS: BLOCKED`. Fix all issues — never leave lint/type/test errors.
 
+## Hypothesis block (iterations ≥ 2)
+
+On revision cycles — whenever `PRIOR_ITERATION_DIGEST` is present in the brief — your handoff **must** begin with an explicit `HYPOTHESIS:` block before the narrative:
+
+```
+HYPOTHESIS: The previous attempt failed AC-3 because the cache invalidation
+ran before the optimistic update committed, so a refetch saw stale state.
+This attempt fixes that by deferring invalidation until the mutation settles.
+```
+
+Two sentences max: (1) why the prior attempt actually failed, (2) what this attempt does differently and why that addresses the root cause. The reviewer will judge the hypothesis independently of whether the diff passes. Do not write hypotheses you don't believe — "hypothesis theatre" gets flagged.
+
+If `PRIOR_ITERATION_DIGEST` carries a `reviewer_counter_hypothesis` from the previous cycle, you **must** address it in your hypothesis — either explain why you accept it and how this attempt acts on it, or explain why you reject it. Ignoring a prior counter-hypothesis is a CRITICAL finding.
+
 ## Handoff
 
 ```
+HYPOTHESIS: [one or two sentences — only on iterations ≥ 2]
+
 ## Handoff Status
 STATUS: COMPLETE | NEEDS_REVISION | BLOCKED
 FILES_CHANGED: [paths]
@@ -54,4 +70,6 @@ Narrative under ~400 words. Cite paths/line ranges, not file contents. Don't ech
 2. NEVER leave code that fails lint or type checks.
 3. NEVER edit a locked test — emit `BLOCKED` with `locked_test_disputed` instead.
 4. NEVER ignore error cases or edge conditions.
-5. ALWAYS verify your stack's automated checks pass before handoff.
+5. NEVER ignore a prior `reviewer_counter_hypothesis` carried in the digest — address it explicitly in your `HYPOTHESIS:`.
+6. ALWAYS verify your stack's automated checks pass before handoff.
+7. On iterations ≥ 2, ALWAYS lead the handoff with a `HYPOTHESIS:` block.

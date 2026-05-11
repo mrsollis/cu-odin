@@ -102,10 +102,21 @@ PRIOR_ITERATION_DIGEST:
   iteration: N
   what_was_tried: <one paragraph>
   why_it_failed: <one paragraph — recurring findings>
+  prior_coder_hypothesis: <verbatim HYPOTHESIS block from prior coder, omit when N=1>
+  reviewer_hypothesis_verdict: confirmed | counter   # only when N >= 2
+  reviewer_counter_hypothesis: <verbatim COUNTER_HYPOTHESIS body when verdict is counter>
+  prior_scores:
+    correctness: <1-5>
+    scope_discipline: <1-5>
+    test_coverage: <1-5>
+    readability: <1-5>
+  score_deltas: <axis: +N/-N notes vs. iteration N-1, when N >= 3>
   hypothesis_for_next: <one paragraph — your structural guess>
 ```
 
 No raw transcripts. No prior-finding paragraphs. Findings flow as `[severity] file:line — one-liner`.
+
+The digest is the reward signal back to the coder. Carry **prior scores** and **the reviewer's hypothesis verdict** verbatim so the coder sees both trajectory (what got better, what regressed) and any standing counter-hypothesis it must address. The coder is non-negotiably required to address a carried `reviewer_counter_hypothesis` in its next `HYPOTHESIS:` block — ignoring it is a CRITICAL finding on the next review pass.
 
 ## Phase 0 — Design gate (only if Phase-0 trigger fires)
 
@@ -163,6 +174,7 @@ Coder rules:
 
 - Initial implementation: full Phase-1 research allowed.
 - Revision cycles: include `PRIOR_ITERATION_DIGEST`. Coder operates in Revision Mode (specific findings only, no scope creep).
+- Revision cycles also require the coder to lead its handoff with a `HYPOTHESIS:` block (two sentences: why the prior attempt failed, what this attempt does differently). If the digest carries a `reviewer_counter_hypothesis`, the coder must address it in the hypothesis — accept or reject explicitly.
 - Coder must pass its stack's automated checks before handoff.
 - `STATUS: BLOCKED` escalates to user immediately — does not count as a loop iteration.
 - Locked tests are off-limits. If a coder believes a locked test is wrong, they emit `STATUS: BLOCKED` with `reason: locked_test_disputed`.
@@ -172,7 +184,40 @@ Reviewer rules:
 - Runs automated checks independently.
 - Recomputes locked-test SHA-256s **only when `metadata.locked_tests` exists**. Drift is automatic CRITICAL → NEEDS_REVISION.
 - Revision cycles focus on whether prior findings were addressed.
+- Every review pass emits a `SCORES:` block (1–5 on `correctness`, `scope_discipline`, `test_coverage`, `readability`) with deltas marked when a prior digest is present.
+- On iterations ≥ 2, every review pass emits `HYPOTHESIS_VERDICT: confirmed | counter` judging the coder's hypothesis independently of whether the diff lands. On `counter`, the reviewer must emit a `COUNTER_HYPOTHESIS:` body. If the reviewer's *prior* counter was ignored by the current coder attempt, flag CRITICAL.
 - **Inline vs separate-context.** Default is inline review (coder and reviewer share context). On the Phase-2 separate-context trigger (>10 files OR cross-cutting refactor), dispatch a fresh `code-review` Task with full brief.
+
+### Hypothesis arbitration (only when reviewer emits `counter`)
+
+When the reviewer's handoff carries `HYPOTHESIS_VERDICT: counter`, three signals are on the table: the coder's `HYPOTHESIS:`, the reviewer's `COUNTER_HYPOTHESIS:`, and the diff itself. Before dispatching the next coder attempt, **arbitrate** — synthesize which hypothesis carries forward:
+
+- **Counter looks correct + coder ignored it** → carry the reviewer's counter as the directive in `hypothesis_for_next`. Brief the next coder to address it explicitly.
+- **Counter looks correct + diff happened to pass** → still carry the counter forward as a yellow flag. Symptom fixes that pass today surface as defects tomorrow; carry forward into the next iteration brief, or note in QA handoff if no further iterations.
+- **Coder hypothesis looks correct + reviewer counter is off** → carry the coder's hypothesis as the directive; include the reviewer's counter as context the next reviewer should re-evaluate.
+- **Both look off** → propose a third framing in `hypothesis_for_next` and own it as yours.
+
+When `HYPOTHESIS_VERDICT: confirmed`, pass through — no arbitration, no extra synthesis. The slim-corpus principle holds: odin spends synthesis tokens only on disagreement.
+
+### Stagnation re-framing (only on detected stagnation)
+
+After each reviewer return on iterations ≥ 2, check rubric trajectory across the last two attempts in this track. **Stagnation** = one or more axes stagnant or regressing across attempts N-1 and N (e.g., `scope_discipline` stays at 1, or `correctness` goes 3→3 with no closer-to-AC movement).
+
+On stagnation, before dispatching attempt N+1, stop pass-through behavior on the brief. Replace the standard digest's directive role with a **re-framed brief**:
+
+```
+PRIOR APPROACH WAS STUCK:
+- Attempts N-1 and N both targeted [path X] and held at [axis: K].
+- Failure mode looks like: [one paragraph synthesis of trajectory + findings].
+- Don't repeat [X]. Consider alternative framings such as [A, B, C].
+- Standard PRIOR_ITERATION_DIGEST included below as reference, not as instruction.
+
+PRIOR_ITERATION_DIGEST: ... (verbatim, demoted to reference)
+```
+
+This is a behavior change in odin, not a new dispatch. Costs ~1–2K tokens of synthesis, fires only when the loop has already failed to converge twice — cheaper than burning another full coder/reviewer cycle on the same approach.
+
+If arbitration also fired on this cycle (reviewer counter), fold the counter's substance into the "alternative framings" line so the next coder sees both signals integrated, not as competing inputs.
 
 Severity:
 
@@ -219,12 +264,45 @@ After all activated gates clear:
 
 Triggered by "QA passed" / "ship it" / "looks good" / pre-authorized auto-mode push.
 
+### Phase-5 atomicity (load-bearing invariant)
+
+`status = 'complete'`, `metadata.outcome`, and `metadata.telemetry` MUST be set in a **single UPDATE statement**. Splitting them is a bug. Repo-specific DB-side triggers fire once on the status flip and snapshot `metadata` at that instant — telemetry or outcome written in a follow-up UPDATE is invisible to the user-facing completion message and any downstream consumers. If telemetry is unavailable at the moment of completion, fold whatever partial data you have into the same UPDATE (and record the gap inside `telemetry`); never use a second UPDATE to "patch in" telemetry or outcome after status has flipped. Downstream gates may cite "Phase-5 atomicity violated" when this is breached.
+
+### Pre-flight assertion (before issuing the UPDATE)
+
+Before issuing the Phase-5 UPDATE, odin's working memory MUST contain non-empty values for:
+
+- `outcome_markdown`
+- `telemetry.started_at`
+- `telemetry.completed_at`
+- `telemetry.duration_seconds`
+- `telemetry.tokens.total`
+- `telemetry.commit_sha`
+- `telemetry.diff`
+- `telemetry.gates`
+
+If any are missing, halt with `STATUS: PHASE_5_PRECONDITIONS_MISSING`, name the missing fields, and ask the dispatcher to backfill. **Never issue the UPDATE with a partial payload** — Phase-5 atomicity makes partial writes unrecoverable without a manual second UPDATE that bypasses the triggers.
+
+### Sequence
+
 1. Commit (auto-generated conventional message in auto mode).
 2. Push.
 3. Capture run + diff telemetry (`git diff --shortstat main...HEAD`, `git diff --name-only`, `git rev-parse --short HEAD`, `git log -1 --pretty=%s`, plus your in-memory gate state). The dispatcher (`/process-ticket`) supplies `started_at`, `completed_at`, `duration_seconds`, and `tokens` (per-agent `{total, calls}` plus a run-level `total`) — merge those into the same telemetry payload. Do not try to compute them yourself; only the dispatcher sees the full ticket lifespan and every `Task` usage record. (Input/output/cache splits and dispatcher-context-fill are not currently captured — `Task` results only expose `total_tokens`. See the dispatcher SKILL for the rationale.)
 4. Author the outcome note from run transcripts (format in [.claude/rules/ticket-schema.md](../rules/ticket-schema.md)).
-5. Single UPDATE: `status = 'complete'`, clear `assigned_to/at`, `branch_name`, `blocked_reason`, merge `outcome` and `telemetry` into `metadata`. SQL template: [.claude/rules/ticket-schema.md](../rules/ticket-schema.md).
-6. Report any downstream tickets (those with this id in `depends_on`) now ready.
+5. Run the pre-flight assertion above.
+6. **Single UPDATE** (per Phase-5 atomicity): `status = 'complete'`, clear `assigned_to/at`, `branch_name`, `blocked_reason`, merge `outcome` and `telemetry` into `metadata`. SQL template: [.claude/rules/ticket-schema.md](../rules/ticket-schema.md).
+7. **Post-write read-back check.** Immediately after the UPDATE, run:
+
+   ```sql
+   SELECT metadata->'outcome'   AS outcome,
+          metadata->'telemetry' AS telemetry,
+          status
+   FROM public.tickets WHERE id = '<this-ticket-id>';
+   ```
+
+   Assert: `status = 'complete'`, `outcome` is non-null and non-empty, `telemetry` is non-null and contains the required keys above. If any assertion fails, emit `STATUS: PHASE_5_CORRUPT_COMPLETION` with the read-back payload and halt loudly — do not paper over it with a follow-up UPDATE. A corrupt completion means a trigger or RLS policy stripped fields, and a silent retry would compound the problem.
+
+8. Report any downstream tickets (those with this id in `depends_on`) now ready.
 
 ## Cohort orchestration (`/process-ticket --orchestrate N`)
 
