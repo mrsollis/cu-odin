@@ -253,6 +253,18 @@ When the queue is empty (or `--loop` exits):
    - Halted (elite-gate / BLOCKED / NEEDS_BRIEF_EXPANSION): list with last-known status
    - Newly-unblocked downstream tickets
 
+**No "suggested follow-ups" section by default.** 
+When all reviewers return APPROVED
+or APPROVED_WITH_FOLLOWUP, do not pad the summary with pre-existing advisor
+warnings, formatting nits in vendored code, or "could-be-cleaner" observations.
+Only surface follow-ups when:
+  - A reviewer flagged a real risk that didn't block this ticket but should be filed
+    before the next cohort touches adjacent code, OR
+  - A non-trivial discovery during the run (like an unapplied migration, a silent
+    regression, a security gap) needs explicit user decision.
+In those cases, name the proposed follow-up tickets concisely (one bullet each)
+and stop. The user files or drops.
+
 **Clean-state acceptance test for shipped tickets:** their branch and worktree are gone. Tickets in `qa` retain both intentionally.
 
 ## Behavior: `list`
