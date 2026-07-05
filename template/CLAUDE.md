@@ -20,7 +20,7 @@
 
 ## Stack detection (automatic)
 
-- `package.json` → web stack (Node / TS / Next.js / pnpm). `coder-web` runs `pnpm lint`, `pnpm type-check`, `pnpm test`, `pnpm build`.
+- `package.json` → web stack (Node / TS / Next.js / yarn). `coder-web` runs `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`.
 - `pubspec.yaml` → Flutter stack. `coder-flutter` runs `dart format`, `flutter analyze`, `flutter test`.
 - Both present → odin splits per-stack sub-tracks.
 

@@ -103,7 +103,7 @@ The three `*-elite` agents (`coder-elite`, `code-review-elite`, `tdd-elite`) are
 
 | Stack | Detected by | Coder | Quality gates |
 |-------|-------------|-------|----------------|
-| Node / TS / Next.js | `package.json` present | `coder-web` | `pnpm lint` / `type-check` / `test` / `build` |
+| Node / TS / Next.js | `package.json` present | `coder-web` | `yarn lint` / `type-check` / `test` / `build` |
 | Flutter / Dart | `pubspec.yaml` present | `coder-flutter` | `dart format` / `flutter analyze` / `flutter test` |
 
 If a repo contains both, odin splits work into per-stack sub-tracks.

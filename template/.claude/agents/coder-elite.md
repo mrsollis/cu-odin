@@ -38,7 +38,7 @@ New non-locked tests for internal helpers are fine.
 
 Same as the standard coder:
 
-- **Web:** `pnpm lint`, `pnpm type-check`, `pnpm test`, `pnpm build`
+- **Web:** `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`
 - **Flutter:** `dart format --set-exit-if-changed .`, `flutter analyze`, `flutter test`, `dart run build_runner build --delete-conflicting-outputs` if applicable
 
 Stack-specific watchpoints from `coder-web.md` / `coder-flutter.md` apply — read whichever matches.

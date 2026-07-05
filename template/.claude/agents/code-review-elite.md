@@ -49,7 +49,7 @@ The standard reviewer's rules apply unchanged: recompute SHA-256 per locked file
 
 ## Stack gates
 
-Web: `pnpm lint`, `pnpm type-check`, `pnpm test`, `pnpm build`. Flutter: `dart format`, `flutter analyze`, `flutter test`.
+Web: `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`. Flutter: `dart format`, `flutter analyze`, `flutter test`.
 
 ## Output
 

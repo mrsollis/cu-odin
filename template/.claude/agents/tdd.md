@@ -45,7 +45,7 @@ Mock only at boundaries production code already crosses (HTTP, DB driver, platfo
 
 After writing the tests:
 
-1. Confirm they all run **red** (the implementation doesn't exist) — web `pnpm run test`, Flutter `flutter test`. A green test at this stage is a tautology.
+1. Confirm they all run **red** (the implementation doesn't exist) — web `yarn test`, Flutter `flutter test`. A green test at this stage is a tautology.
 2. Compute SHA-256 of every test file you created or modified.
 3. Write the manifest into `tickets.metadata.locked_tests` via Supabase MCP, using `metadata = metadata || jsonb_build_object('locked_tests', <manifest>)` to preserve other keys.
 

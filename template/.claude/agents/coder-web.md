@@ -35,7 +35,7 @@ When `LOCKED_TESTS` is in the brief, you must **not** modify any listed file: no
 
 ## Verification
 
-Detect package manager from the lockfile (`pnpm-lock.yaml`/`yarn.lock`/`bun.lockb` → otherwise npm). Run the project's scripts; conventional set: `<pm> run lint`, `<pm> run type-check` (or `tsc --noEmit`), `<pm> run test`, and for Next.js production-targeted changes `<pm> run build` (catches Server/Client component violations and serialization errors). If `CLAUDE.md` documents different commands, prefer those. If gates can't be determined, emit `STATUS: BLOCKED`. Fix all issues — never leave lint/type/test errors.
+Detect package manager from the lockfile (`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml` → otherwise yarn). Run the project's scripts; conventional set: `<pm> run lint`, `<pm> run type-check` (or `tsc --noEmit`), `<pm> run test`, and for Next.js production-targeted changes `<pm> run build` (catches Server/Client component violations and serialization errors). If `CLAUDE.md` documents different commands, prefer those. If gates can't be determined, emit `STATUS: BLOCKED`. Fix all issues — never leave lint/type/test errors.
 
 ## Hypothesis block (iterations ≥ 2)
 
