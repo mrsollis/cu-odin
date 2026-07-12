@@ -8,6 +8,10 @@
 
 > **Context-light briefs.** Odin reads `CLAUDE.md`, `.claude/rules/domain.md`, and `.claude/rules/design-system/` once at session start, then passes each specialist a slim task-scoped brief. Specialists do **not** re-read the corpus when dispatched by odin — they trust the brief or return `STATUS: NEEDS_BRIEF_EXPANSION`. Direct invocations (`@coder-web` etc.) bootstrap fully.
 
+> **Worktree by default.** Every ticket runs in its own fresh git worktree under `.worktrees/<id>/`, branched off a freshly-pulled base — the detected default branch (not assumed to be `main`), or `--branch <name>`. `--no-worktree` runs a single ticket in-place instead. On successful ship the dispatcher **offers** to merge into the default branch; `--auto-merge` merges without asking (local only), and `--push` pushes the default branch after merging. In headless mode nothing merges unless `--auto-merge` is set.
+
+> **Effort-adaptive pipeline.** Odin runs an up-front effort-sizing pass on each ticket (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — to keep small tickets cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, tdd-invariant, and elite-escalation gates fire on their scope triggers regardless of size. Quality, security, and performance are never traded for tokens.
+
 > **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/harness-reuse.md`, `.claude/skills/{add-ticket,process-ticket}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
 
 ## Read first
@@ -37,7 +41,7 @@ Supabase Auth + Row-Level Security. Every new table needs RLS policies; `securit
 Tickets live in Supabase. Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project.
 
 - [/add-ticket](.claude/skills/add-ticket/SKILL.md) — file a new ticket.
-- [/process-ticket](.claude/skills/process-ticket/SKILL.md) — claim, dispatch to `@odin`. Supports `--loop`, `--orchestrate N`, filters, `--dry-run`. Push and ticket completion are user-triggered Phase 5 only.
+- [/process-ticket](.claude/skills/process-ticket/SKILL.md) — claim, dispatch to `@odin`. Supports `--loop`, `--orchestrate N`, filters, `--dry-run`, and the worktree/merge flags `--no-worktree`, `--branch <name>`, `--auto-merge`, `--push`. Push and ticket completion are user-triggered Phase 5 only.
 
 ## Agents
 

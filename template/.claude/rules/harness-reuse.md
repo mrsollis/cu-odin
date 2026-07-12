@@ -26,6 +26,10 @@ Nothing else to configure — the Supabase project id lives in the Supabase MCP 
 
 Re-run `npx -y github:mrsollis/cu-odin`. Answer `y` to the `CLAUDE.md` and agents prompts; defaults preserve your `domain.md` and `design-system/*`.
 
+## Worktree & merge flags (`/process-ticket`)
+
+Every ticket runs in a fresh per-ticket worktree off a freshly-pulled base by default. Adjust with `--no-worktree` (in-place branch, single ticket only), `--branch <name>` (base off a branch other than the detected default), `--auto-merge` (merge into the default branch on ship without prompting — local only), and `--push` (push the default branch after merging). See the [process-ticket skill](../skills/process-ticket/SKILL.md).
+
 ## Configuration: thorough mode (backwards compat)
 
 The default pipeline is **conditional** — every gate has an explicit trigger evaluated against planned scope. To force the prior behavior (every gate fires on every ticket), set this in the host repo's `.claude/settings.local.json`:

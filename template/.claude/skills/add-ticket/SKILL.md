@@ -20,8 +20,8 @@ When the user asks to create a ticket, track work, or file an issue.
    - **category** (required): `perf` | `security` | `feature` | `bug` | `chore`.
    - **priority** (required): `critical` | `high` | `medium` | `low`.
    - **tier** (optional): int, lower = higher priority within bucket.
-   - **effort_estimate** (optional): human-readable, e.g. `~half day`.
-   - **files_affected** (optional): array of file paths this ticket touches. Used by `/process-ticket --orchestrate` to avoid parallel collisions.
+   - **effort_estimate** (optional, recommended): human-readable, e.g. `~half day`. Feeds odin's effort-sizing pass — well-estimated small tickets skip planning overhead and run cheaper.
+   - **files_affected** (optional, recommended): array of file paths this ticket touches. Feeds odin's effort-sizing pass and orders merges at ship.
    - **depends_on** (optional): array of ticket ids that must be `complete` first.
 
    Do **not** ask the user for an `id` — the database assigns it via `next_ticket_id()` (`T-1`, `T-2`, …).

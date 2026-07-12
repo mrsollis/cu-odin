@@ -74,7 +74,7 @@ You read `CLAUDE.md`, `.claude/rules/domain.md`, and `.claude/rules/design-syste
 ```
 BRIEF_FROM: odin
 TICKET: { id, title, status }
-WORKTREE: <path or "." for single-track>
+WORKTREE: <.worktrees/<id-lower> by default; "." only under --no-worktree>
 STACK: web | flutter
 TASK: <one-paragraph scope>
 ACCEPTANCE_CRITERIA: [AC-1 ...]
@@ -124,12 +124,29 @@ Dispatch `ux-design`. Wait for `STATUS: SPEC_COMPLETE` before proceeding. On `ST
 
 ## Phase 1 — Planning
 
+### Effort sizing (do this first)
+
+Before spinning up any planner, gauge the level of work from the ticket itself — the dispatcher hands you `effort_estimate`, `tier`, `category`, `description`, and `files_affected`. Classify the ticket and tune the **discretionary** effort so small tickets stay cheap in time, compute, and tokens:
+
+| Size | Signals | Discretionary shaping |
+|------|---------|-----------------------|
+| **Trivial** | 1–2 files, no new surface, low `effort_estimate` | Skip Phase 1 planners entirely; author a minimal AC list yourself and go straight to a single coder + inline review. |
+| **Small** | few files, one subsystem | Single planner, inline review. |
+| **Medium** | several files / subsystems | Single planner + whatever gates the triggers activate. |
+| **Large** | cross-stack, new public surface, or many subsystems | Multi-planner, parallel tracks, full activated gate set. |
+
+**Non-negotiable safety floor.** Sizing tunes only discretionary effort — planning depth, review context, fan-out, model defaults. It **never** downgrades a safety gate. Security-review, data-architect, tdd-locked-tests on security/data invariants, and the elite-escalation gate still fire on their scope triggers regardless of size. Quality, security, and performance are never traded for tokens: if a trivial-looking ticket trips a safety trigger (touches auth, RLS, a migration, an encryption path), that gate runs at full strength. When in doubt about a size boundary, size **up**.
+
+Record the chosen size in `metadata.gate_set` (e.g. `effort_size: "small"`) alongside the gate decisions so review/audit can reconstruct the run.
+
+### Planning
+
 Single planner by default. Multi-planner only on the Phase-1 trigger. When the work touches data, include `data-architect` Mode A as a planner; pass `SESSION_MODE` so its migration-apply behavior matches the harness mode.
 
 After synthesis:
 
 1. Author a flat **acceptance criteria** list — one item per user-visible behavior, testable, with `AC-N` ids. Persist to `metadata.acceptance_criteria`.
-2. **Compute and persist `metadata.gate_set`** — which gates fire and why, so review/audit can reconstruct the run.
+2. **Compute and persist `metadata.gate_set`** — which gates fire and why, plus the `effort_size` from the sizing step, so review/audit can reconstruct the run.
 3. Identify parallel-safe tracks. Per-track stack routing: `*.tsx`/`*.ts`/`*.css`/`package.json` → web; `*.dart`/`pubspec.yaml` → flutter. Mixed tracks split into web + flutter sub-tracks.
 4. Post the plan + activated gate set. In interactive mode, wait for approval. In headless mode, proceed.
 
@@ -286,12 +303,13 @@ If any are missing, halt with `STATUS: PHASE_5_PRECONDITIONS_MISSING`, name the 
 ### Sequence
 
 1. Commit (auto-generated conventional message in auto mode).
-2. Push.
-3. Capture run + diff telemetry (`git diff --shortstat main...HEAD`, `git diff --name-only`, `git rev-parse --short HEAD`, `git log -1 --pretty=%s`, plus your in-memory gate state). The dispatcher (`/process-ticket`) supplies `started_at`, `completed_at`, `duration_seconds`, and `tokens` (per-agent `{total, calls}` plus a run-level `total`) — merge those into the same telemetry payload. Do not try to compute them yourself; only the dispatcher sees the full ticket lifespan and every `Task` usage record. (Input/output/cache splits and dispatcher-context-fill are not currently captured — `Task` results only expose `total_tokens`. See the dispatcher SKILL for the rationale.)
-4. Author the outcome note from run transcripts (format in [.claude/rules/ticket-schema.md](../rules/ticket-schema.md)).
-5. Run the pre-flight assertion above.
-6. **Single UPDATE** (per Phase-5 atomicity): `status = 'complete'`, clear `assigned_to/at`, `branch_name`, `blocked_reason`, merge `outcome` and `telemetry` into `metadata`. SQL template: [.claude/rules/ticket-schema.md](../rules/ticket-schema.md).
-7. **Post-write read-back check.** Immediately after the UPDATE, run:
+2. **Merge into the default branch** is dispatcher-owned, not yours — the dispatcher rebases the ticket branch onto the default branch, re-runs gates, and does the `--no-ff` merge, gated by its authorization matrix (interactive offers; `--auto-merge` merges silently; headless without `--auto-merge` skips). You do not run `git merge` yourself.
+3. **Push** only when `--push` is present or the user/pre-authorized-headless explicitly asked. A bare `--auto-merge` is a **local** merge — do not push.
+4. Capture run + diff telemetry (`git diff --shortstat <default-branch>...HEAD`, `git diff --name-only`, `git rev-parse --short HEAD`, `git log -1 --pretty=%s`, plus your in-memory gate state). The dispatcher (`/process-ticket`) supplies `started_at`, `completed_at`, `duration_seconds`, and `tokens` (per-agent `{total, calls}` plus a run-level `total`) — merge those into the same telemetry payload. Do not try to compute them yourself; only the dispatcher sees the full ticket lifespan and every `Task` usage record. (Input/output/cache splits and dispatcher-context-fill are not currently captured — `Task` results only expose `total_tokens`. See the dispatcher SKILL for the rationale.)
+5. Author the outcome note from run transcripts (format in [.claude/rules/ticket-schema.md](../rules/ticket-schema.md)).
+6. Run the pre-flight assertion above.
+7. **Single UPDATE** (per Phase-5 atomicity): `status = 'complete'`, clear `assigned_to/at`, `branch_name`, `blocked_reason`, merge `outcome` and `telemetry` into `metadata`. SQL template: [.claude/rules/ticket-schema.md](../rules/ticket-schema.md).
+8. **Post-write read-back check.** Immediately after the UPDATE, run:
 
    ```sql
    SELECT metadata->'outcome'   AS outcome,
@@ -302,11 +320,11 @@ If any are missing, halt with `STATUS: PHASE_5_PRECONDITIONS_MISSING`, name the 
 
    Assert: `status = 'complete'`, `outcome` is non-null and non-empty, `telemetry` is non-null and contains the required keys above. If any assertion fails, emit `STATUS: PHASE_5_CORRUPT_COMPLETION` with the read-back payload and halt loudly — do not paper over it with a follow-up UPDATE. A corrupt completion means a trigger or RLS policy stripped fields, and a silent retry would compound the problem.
 
-8. Report any downstream tickets (those with this id in `depends_on`) now ready.
+9. Report any downstream tickets (those with this id in `depends_on`) now ready.
 
 ## Cohort orchestration (`/process-ticket --orchestrate N`)
 
-Parent Odin holds N tickets in working memory; no sub-Odins, no CLI subprocesses. Per ticket, `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> main`. Specialist briefs include `WORKTREE: .worktrees/<id-lower>`.
+Parent Odin holds N tickets in working memory; no sub-Odins, no CLI subprocesses. Per ticket, the dispatcher creates a fresh worktree off the freshly-pulled base (`git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>`) and passes `WORKTREE: .worktrees/<id-lower>` in each brief. Single-track (non-cohort) runs also get a fresh per-ticket worktree by default — the only difference is cohort holds several at once. `--no-worktree` (single-ticket only) reverts to in-place branching with `WORKTREE: .`.
 
 For each phase, dispatch one `Task` per ticket in a single message so they run in parallel. After the batch returns, advance each ticket's phase based on its result. One ticket's failure never freezes the cohort — record state and continue the others.
 

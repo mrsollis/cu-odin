@@ -1,6 +1,6 @@
 {
   "name": "@mrsollis/cu-odin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Drop-in Claude Code agent harness: an opus-led orchestrator (odin) coordinating coder, code-review, security-review, and ux-design subagents, with stack detection for Node/Next.js and Flutter.",
   "bin": {
     "cu-odin": "bin/cu-odin.js"

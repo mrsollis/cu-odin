@@ -42,6 +42,7 @@ Stack is auto-detected from the repo: `package.json` → web track, `pubspec.yam
 
 For any non-trivial request, odin runs a multi-phase loop without you needing to invoke it explicitly:
 
+0. **Effort sizing** (up front). Odin gauges the level of work from the ticket itself (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — so trivial tickets stay cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, tdd-invariant, and elite-escalation gates fire on their scope triggers regardless of size — quality, security, and performance are never traded for tokens.
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Odin authors a flat list of acceptance criteria into `metadata.acceptance_criteria`; this is what `tdd` anchors locked tests to and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
 3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 into the ticket's `metadata.locked_tests`. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
@@ -49,7 +50,7 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 5. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
 6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 4-attempt cap.
 7. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` (authored by odin from the run transcripts) alongside structured run telemetry in `metadata.telemetry`.
-8. **Phase 5 — Ship** (user-triggered only). Commit, push, ticket → `complete`.
+8. **Phase 5 — Ship** (user-triggered only). Commit, then **offer to merge into the default branch** (`--auto-merge` merges without asking, local only; `--push` also pushes; headless merges only with `--auto-merge`), ticket → `complete`.
 
 ### Context-light specialist briefs
 
@@ -65,7 +66,7 @@ One explicit exception: **a dirty working tree always prompts** (commit / stash 
 
 ### Cohort orchestration (`/process-ticket --orchestrate N`)
 
-For multi-ticket runs, the parent Odin session manages all N tickets in-parallel itself, dispatching specialists via the `Task` tool — one specialist call per ticket per phase, run in parallel where independent. There are no `claude` CLI subprocesses, no nested sub-Odins, and no status-file polling. Each ticket gets its own git worktree under `.worktrees/<id-lower>/` so the diffs don't collide; merges back to `main` happen at user-triggered Phase 5 ship.
+For multi-ticket runs, the parent Odin session manages all N tickets in-parallel itself, dispatching specialists via the `Task` tool — one specialist call per ticket per phase, run in parallel where independent. There are no `claude` CLI subprocesses, no nested sub-Odins, and no status-file polling. Every ticket — single or cohort — gets its own fresh git worktree under `.worktrees/<id-lower>/`, branched off a freshly-pulled base, so the diffs don't collide; merges back to the default branch happen at user-triggered Phase 5 ship (offered by default, silent under `--auto-merge`).
 
 ## Customization (the only files you need to edit)
 

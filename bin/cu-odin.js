@@ -374,6 +374,12 @@ let the harness signal "Auto mode active", to run unattended. The dispatcher
 will not emit operational prompts in auto mode (the only exception is a dirty
 working tree, which always prompts to commit/stash/abort).
 
+Worktrees: every ticket runs in its own fresh git worktree off a
+freshly-pulled base branch (opt out per ticket with --no-worktree; pick a
+base with --branch <name>). On ship the dispatcher offers to merge into the
+default branch; --auto-merge does it without asking (local only) and --push
+pushes the default branch after merging.
+
 Cohort orchestration: /process-ticket --orchestrate N runs N tickets in
 parallel inside the same Claude session via Task-dispatched specialists,
 each in its own git worktree. There are no separate claude CLI subprocesses.

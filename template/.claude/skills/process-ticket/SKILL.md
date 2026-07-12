@@ -1,7 +1,7 @@
 ---
 name: process-ticket
 description: Pick up, dispatch, and report on tickets from the project's Supabase tickets table. Hands each claimed ticket to @odin for execution, supports per-ticket queue runs and worktree-based parallel cohort orchestration.
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Process Ticket
@@ -9,6 +9,8 @@ version: 2.0.0
 Dispatcher / queue runner for the project's `public.tickets` table. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in. Ticket ids follow the canonical `T-<N>` format assigned by the database (`next_ticket_id()`).
 
 This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the conditional pipeline (planning → activated-gates set per scope → coder/review loop with elite gate → QA handoff). Gates that don't match the planned scope are skipped — see odin.md for the trigger table. The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, and end-of-run cleanup; gate decisions live in odin.
+
+**Every ticket runs in its own fresh git worktree by default** (single-ticket and cohort alike), branched off a freshly-pulled base branch. `--no-worktree` opts a single ticket back into in-place branching. Odin also runs an up-front **effort-sizing** pass so small tickets stay cheap — it tunes discretionary effort (planning depth, review context, fan-out), **never** a safety gate. See odin.md.
 
 The orchestrate path (`--orchestrate N`) runs the cohort **in-session** — parent Odin holds N tickets in working memory and dispatches specialists via `Task` (one specialist call per ticket per phase, all parallel calls in a single message). There are no `claude` CLI subprocesses, no nested sub-Odins, no status-file polling.
 
@@ -46,6 +48,13 @@ When the user wants to: pick up the next ready ticket, drain the queue, run mult
 - `--category bug,chore` — Only claim tickets in these categories.
 - `--tier 1` — Only claim tickets at this tier (or lower number = higher priority).
 
+### Worktree & merge flags
+
+- `--no-worktree` — Run the ticket in-place on a branch in the main working tree (the legacy behavior) instead of an isolated worktree. **Ignored (with a warning) under `--orchestrate`** — cohort mode always requires one worktree per ticket for isolation.
+- `--branch <name>` — Base the ticket worktree(s) / branch off `<name>` instead of the detected default branch. The base is still freshly pulled before the worktree is created (see Base branch resolution).
+- `--auto-merge` — On successful ship, merge the ticket branch into the default branch automatically, no prompt. **Local merge only — does not push.**
+- `--push` — After a merge, push the default branch to the remote. Without it, merges stay local (matches the "push is user-triggered" rule).
+
 ## Operating modes
 
 The dispatcher inherits the session mode:
@@ -74,7 +83,28 @@ This applies to **both** the single-ticket path and the orchestrate path. There 
    - Default `commit`. Do not auto-commit without confirmation. Do not silently abort.
 3. Once clean, proceed with claim.
 
-For `--orchestrate`, the main working tree stays on `main`; per-ticket worktrees branch off `main` at claim time, so the check still applies once at run start.
+For `--orchestrate`, the main working tree stays on the default branch; per-ticket worktrees branch off a freshly-pulled base at claim time, so the check still applies once at run start.
+
+## Base branch resolution
+
+The base branch is **not assumed to be `main`**. Resolve it once at run start and reuse the value everywhere these instructions say `<default-branch>` / `<base>`.
+
+1. **Detect the default branch:**
+   ```sh
+   DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
+   ```
+   Fallbacks in order: `git remote show origin` HEAD-branch line → a local `main` or `master` if present → the current branch.
+2. **Base = `--branch <name>` when given, else `<default-branch>`.**
+3. **Fresh pull before every worktree.** Immediately before creating a ticket's worktree (or in-place branch), update the base from the remote so the ticket starts from up-to-date state, never a stale local ref:
+   ```sh
+   git -C <repo-root> fetch origin <base>          # best-effort; skip cleanly if no remote
+   git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>
+   # no-remote / detached fallback:
+   #   git -C <repo-root> checkout <base> && git -C <repo-root> pull --ff-only
+   #   git worktree add .worktrees/<id-lower> -b ticket/<id-lower> <base>
+   ```
+
+The **default branch** (detection step 1) is always the merge target at ship, regardless of `--branch`. `--branch` only changes the *base* a ticket is built on.
 
 ## Claim sequencing
 
@@ -82,10 +112,11 @@ Order is load-bearing:
 
 1. Pre-flight 0 — capability check (above).
 2. Pre-flight 1 — clean working tree (above).
-3. Branch / worktree feasibility — verify `ticket/<id-lower>` is free (and, for orchestrate, that `.worktrees/<id-lower>` does not already exist).
-4. **Atomic claim SQL** — only after 1–3 pass.
-5. Branch creation (`git checkout -b ...` or `git worktree add ...`).
-6. Hand to Odin (single-agent: become Odin inline; orchestrate: hold the cohort and dispatch specialists in parallel).
+3. Base branch resolution — detect `<default-branch>`, pick `<base>` (above).
+4. Branch / worktree feasibility — verify `ticket/<id-lower>` is free and `.worktrees/<id-lower>` does not already exist (skip the worktree-path check only under `--no-worktree`).
+5. **Atomic claim SQL** — only after 1–4 pass.
+6. Fresh-pull `<base>`, then create the workspace: `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>` by default, or `git checkout -b ticket/<id-lower>` from a freshly-pulled `<base>` under `--no-worktree`.
+7. Hand to Odin (single-agent: become Odin inline; orchestrate: hold the cohort and dispatch specialists in parallel).
 
 ## Behavior: no-args / `next` / `--loop` (single-agent path)
 
@@ -127,12 +158,14 @@ RETURNING id, title, category, priority, tier, effort_estimate, description,
 - Priority: critical > high > medium > low. Tie-break: tier ASC, then FIFO.
 - If no ready ticket, report queue state. In `--loop`, exit the loop.
 
-4. **Branch:** `git checkout -b ticket/<id-lower>` from clean `main`.
+4. **Workspace:** default is a fresh per-ticket worktree — ensure `.worktrees/` exists and is git-ignored (add to `.gitignore` if missing), then fresh-pull `<base>` and `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>`. Under `--no-worktree`, `git checkout -b ticket/<id-lower>` from a freshly-pulled `<base>` in the main tree instead.
 
 5. **Become Odin inline.** Read [.claude/agents/odin.md](../../agents/odin.md) and run the pipeline yourself in this same top-level session, dispatching specialists via `Task`. Carry into the run:
    - The ticket id and full description.
+   - The ticket's sizing signals — `effort_estimate`, `tier`, `category`, `files_affected` (from the claim `RETURNING`) — so Odin can run its effort-sizing pass.
+   - `WORKTREE: .worktrees/<id-lower>` by default, or `WORKTREE: .` under `--no-worktree`.
    - The session mode (interactive/headless).
-   - "Ticket already claimed; branch already created. Skip ticket-creation steps. Run through QA handoff (Phase 4). Do not ship — the dispatcher manages commit and the user controls Phase 5 (in interactive mode) or auto-mode pre-authorization triggers Phase 5."
+   - "Ticket already claimed; workspace already created. Skip ticket-creation steps. Run through QA handoff (Phase 4). Do not ship — the dispatcher manages commit and the user controls Phase 5 (in interactive mode) or auto-mode pre-authorization triggers Phase 5."
 
 6. **Wait for `@odin`** to reach Phase 4 (status → `qa`, `metadata.qa.checklist` written) — or to halt (BLOCKED).
 
@@ -154,9 +187,10 @@ The dispatcher orchestrates up to **N tickets in parallel inside this same sessi
 
 1. Pre-flight 0 — capability check (`Task` tool present in parent).
 2. Pre-flight 1 — clean tree (always prompts on dirty).
-3. Mode declaration. In headless, no auto-commit prompt — auto-commit is on.
-4. Best-effort `git pull --ff-only origin main` if a remote is tracked.
-5. Ensure `.worktrees/` exists and is git-ignored. Add to `.gitignore` if missing.
+3. Base branch resolution — detect `<default-branch>`, pick `<base>`. `--no-worktree` is **ignored under `--orchestrate`** (warn once): cohort mode always uses one worktree per ticket.
+4. Mode declaration. In headless, no auto-commit prompt — auto-commit is on.
+5. Best-effort `git -C <repo-root> fetch origin <base>` (and `git pull --ff-only` on the checked-out branch) if a remote is tracked.
+6. Ensure `.worktrees/` exists and is git-ignored. Add to `.gitignore` if missing.
 
 ### Cohort dispatch loop
 
@@ -168,10 +202,10 @@ Repeat until the queue is empty OR fewer than 1 ticket is ready (in `--loop`, ke
 
 2. **Claim the cohort** — one atomic UPDATE per ticket using the claim SQL above, with distinct `assigned_to` values: `odin-1`, `odin-2`, …
 
-3. **For each claimed ticket, create a worktree:**
-   - `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> main`
+3. **For each claimed ticket, create a fresh worktree off the freshly-pulled base:**
+   - `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>`
 
-4. **Become Odin in cohort mode.** Read [.claude/agents/odin.md](../../agents/odin.md) and follow the "Cohort coordination" section. Hold cohort state as a structured map. For each phase, dispatch one specialist `Task` per ticket in a single message. Each `Task` brief includes `WORKTREE: .worktrees/<id-lower>` so the specialist's `Bash`/`Read`/`Edit` calls scope to that worktree.
+4. **Become Odin in cohort mode.** Read [.claude/agents/odin.md](../../agents/odin.md) and follow the "Cohort coordination" section. Hold cohort state as a structured map. For each phase, dispatch one specialist `Task` per ticket in a single message. Each `Task` brief includes `WORKTREE: .worktrees/<id-lower>` (so the specialist's `Bash`/`Read`/`Edit` calls scope to that worktree) and the ticket's sizing signals (`effort_estimate`, `tier`, `category`, `files_affected`) so Odin can size each ticket.
 
 5. **Cohort failure isolation.** When one ticket's `Task` returns `STATUS: BLOCKED` or `STATUS: NEEDS_BRIEF_EXPANSION`, record the state on that ticket and continue the cohort's other tickets in the same phase. One bad ticket never freezes the cohort.
 
@@ -225,20 +259,31 @@ Applied after each ticket reaches QA handoff, on the ticket's branch (or worktre
 
 **Push and `status='complete'` are user-triggered Phase 5 only — except in headless mode when the user explicitly pre-authorized push (e.g., the `headless` invocation included a "ship as you go" intent). Default headless behavior is auto-commit per ticket but stop at QA handoff, the same as today.**
 
-### Merge-back (only on user ship)
+### Merge into the default branch (on ship)
 
-The dispatcher does **not** merge during the run. Cross-ticket file overlap is resolved here, not by serializing the cohort. When the user triggers Phase 5 ("ship it" / "ship T-42" / "ship all"):
+The dispatcher does **not** merge during the run — cross-ticket file overlap is resolved here, not by serializing the cohort. This section applies to **both** single-ticket and cohort runs. When the user triggers Phase 5 ("ship it" / "ship T-42" / "ship all"), first decide **whether** to merge from this authorization matrix:
 
-1. **Determine merge order.** Group ticket branches by file overlap (declared or inferred `files_affected`). Within an overlap group, merge in claim order (FIFO) so earlier tickets become the rebase base for later ones. Across non-overlapping groups the order does not matter.
+| Situation | Merge behavior |
+|-----------|----------------|
+| Interactive, no `--auto-merge` | **Offer** per ticket: "Merge `ticket/<id>` into `<default-branch>`? merge / skip". Default `merge`. |
+| `--auto-merge` (any mode) | Merge without asking. |
+| Headless, no `--auto-merge` | **No merge** — leave the committed branch + worktree in place for later manual ship. |
+| `--push` present (with a merge) | After the merge, push `<default-branch>`. Otherwise the merge stays local. |
+
+`<default-branch>` is the detected default (Base branch resolution), **not** `--branch` — `--branch` only sets a ticket's base, never the merge target.
+
+When a merge is authorized:
+
+1. **Determine merge order.** Group ticket branches by file overlap (declared or inferred `files_affected`). Within an overlap group, merge in claim order (FIFO) so earlier tickets become the rebase base for later ones. Across non-overlapping groups the order does not matter. (Single-ticket runs skip straight to step 2 with one branch.)
 2. **For each ticket branch, in order:**
-   1. `git -C <repo-root> checkout main && git -C <repo-root> pull --ff-only` (best-effort).
-   2. **Pre-rebase the ticket branch onto current main** in its worktree: `git -C .worktrees/<id-lower> rebase main`.
+   1. `git -C <repo-root> checkout <default-branch> && git -C <repo-root> pull --ff-only` (best-effort).
+   2. **Pre-rebase the ticket branch onto current `<default-branch>`.** In a worktree run: `git -C .worktrees/<id-lower> rebase <default-branch>`. Under `--no-worktree`: `git -C <repo-root> rebase <default-branch>` on the checked-out ticket branch.
    3. **Auto-resolve disjoint-hunk conflicts.** If conflicts are limited to non-overlapping line ranges within the same file, apply both sides via a clean three-way merge.
-   4. **Escalate semantic conflicts to the user.** Overlapping hunks, the same symbol redefined two ways, deleted-vs-modified files, lock-file divergence — present the conflict block plus both ticket descriptions plus a recommended resolution. Do not auto-pick a side.
-   5. **Re-run quality gates in the rebased worktree** by dispatching a fresh `coder-*` `Task` scoped to that worktree (gates only — no implementation). A passing rebased branch then merges into `main` with `git -C <repo-root> merge --no-ff ticket/<id-lower>`. A failing rebased branch routes back to the ticket's coder for one capped fix-up round before re-attempting merge.
-   6. After a successful merge, hand off to `@odin` Phase 5 to update the ticket: `status='complete'`, `completed_at=now()`, clear `assigned_to`, `branch_name`, `blocked_reason`, in-progress labels. Then `git worktree remove .worktrees/<id-lower>` and `git branch -d ticket/<id-lower>`.
+   4. **Escalate semantic conflicts to the user.** Overlapping hunks, the same symbol redefined two ways, deleted-vs-modified files, lock-file divergence — present the conflict block plus the ticket description(s) plus a recommended resolution. Do not auto-pick a side.
+   5. **Re-run quality gates in the rebased workspace** by dispatching a fresh `coder-*` `Task` scoped to it (gates only — no implementation). A passing rebased branch then merges into `<default-branch>` with `git -C <repo-root> merge --no-ff ticket/<id-lower>`. A failing rebased branch routes back to the ticket's coder for one capped fix-up round before re-attempting merge.
+   6. After a successful merge, hand off to `@odin` Phase 5 to update the ticket: `status='complete'`, `completed_at=now()`, clear `assigned_to`, `branch_name`, `blocked_reason`, in-progress labels. Then remove the workspace — `git worktree remove .worktrees/<id-lower>` (worktree runs) and `git branch -d ticket/<id-lower>`.
+   7. **Push** `<default-branch>` only when `--push` is present, or with explicit user confirmation (matches Odin's rule, except in pre-authorized headless). Never push on a bare `--auto-merge`.
 3. **Locked-tests integrity across merges.** When a later ticket's rebase touches a file an earlier-merged ticket locked in `metadata.locked_tests`, recompute SHA-256 hashes after rebase and **before** running gates. Drift means a later ticket weakened an earlier ticket's contract — escalate to the user, do not auto-merge.
-4. Push only with explicit user confirmation (matches Odin's existing rule, except in pre-authorized headless).
 
 ### End-of-run cleanup
 
@@ -296,6 +341,8 @@ Show the table with `dep_status`. Ask which id to pick up. Warn on blocked selec
 2. If `--orchestrate N`, also compute the merge-overlap plan (overlap groups based on declared/inferred `files_affected`) — used for merge ordering, not for serializing the cohort.
 3. Print:
    - Tickets that would be claimed, in claim order.
+   - Resolved `<default-branch>` and `<base>` (noting a `--branch` override), and the worktree plan (per-ticket worktree vs `--no-worktree` in-place).
+   - Merge authorization mode at ship: offer (interactive default) / auto (`--auto-merge`) / none (headless without `--auto-merge`), and whether `--push` is armed.
    - Cohort: all ready tickets up to `N` run in parallel in-session.
    - Merge-overlap groups: which tickets share files and will therefore merge in FIFO order at ship.
    - Whether the cohort-of-one shortcut would apply (cohort=1).
@@ -447,11 +494,11 @@ FROM public.tickets WHERE id = '<id>';
 
 1. **Never ask to claim** — the user invoked the skill, that's the authorization.
 2. **Capability pre-flight, then clean tree pre-flight** — in that order, always. Abort before any state mutation if either fails.
-3. **One worktree per in-flight ticket** in orchestrate mode. Never share a working directory between cohort tickets.
+3. **One fresh worktree per in-flight ticket** — single-ticket and cohort alike (only `--no-worktree` opts a single ticket out). Never share a working directory between tickets.
 4. **Do not serialize on file overlap.** Sub-tickets work in isolated worktrees and the dispatcher resolves cross-ticket conflicts at merge-back. `files_affected` is signal for ordering merges, not a gate on parallelism.
 5. **All cohort work runs in-session via `Task`.** No `claude` CLI subprocesses. No `Agent(subagent_type=odin)` calls. The parent session is the only Odin.
 6. **Dispatcher owns merges** — only on user-triggered ship. Conflicts are resolved by the dispatcher with user input on anything non-trivial.
 7. **Worktrees stay until ship.** Tickets in `qa` keep their worktree so the user can review the work before shipping.
 8. **Stale-cohort sweep on every run-start** — idempotent cleanup of zero-commit worktrees from prior crashed runs.
 9. **End-of-run invariant for shipped tickets:** branch deleted, worktree removed. In-QA tickets retain both intentionally.
-10. **Headless never auto-pushes and never auto-completes by default.** Push and `status='complete'` require explicit user trigger every time, unless the user pre-authorized in the headless invocation.
+10. **Headless never auto-pushes and never auto-completes by default.** Push and `status='complete'` require explicit user trigger every time, unless the user pre-authorized in the headless invocation. `--auto-merge` and `--push` are the explicit pre-authorization forms for the merge and push steps respectively — but neither triggers ship by itself: `--auto-merge` only governs what happens **when** ship fires (user trigger or ship pre-authorization), it does not authorize ship.
