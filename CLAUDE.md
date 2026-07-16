@@ -19,11 +19,11 @@ CLAUDE.md
 │   ├── odin.md                  # orchestrator (opus) — auto-loaded by CLAUDE.md
 │   ├── coder-web.md             # Node/TS/Next.js implementer (sonnet)
 │   ├── coder-flutter.md         # Dart/Flutter implementer (sonnet)
-│   ├── coder-elite.md           # fable escalation coder (gated)
+│   ├── coder-elite.md           # escalation coder (gated; opus → fable)
 │   ├── code-review.md           # standard reviewer (sonnet)
-│   ├── code-review-elite.md     # fable escalation reviewer (gated)
+│   ├── code-review-elite.md     # escalation reviewer (gated; opus → fable)
 │   ├── tdd.md                   # test custodian — writes & locks the test contract (sonnet)
-│   ├── tdd-elite.md             # fable escalation custodian (gated)
+│   ├── tdd-elite.md             # escalation custodian (gated; opus → fable)
 │   ├── data-architect.md        # Supabase schema / RLS / data security (sonnet)
 │   ├── security-review.md       # OWASP-focused review (opus)
 │   └── ux-design.md             # design spec producer (sonnet)
@@ -46,9 +46,9 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Odin authors a flat list of acceptance criteria into `metadata.acceptance_criteria`; this is what `tdd` anchors locked tests to and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
 3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 into the ticket's `metadata.locked_tests`. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
-4. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **4 total attempts per track** (2 sonnet, then up to 2 fable elite if the elite-escalation gate passes). If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
+4. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **6 total attempts per track** (2 sonnet, then up to 2 opus elite, then up to 2 fable elite — each escalation rung gated separately). If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
 5. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
-6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 4-attempt cap.
+6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 6-attempt cap.
 7. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` (authored by odin from the run transcripts) alongside structured run telemetry in `metadata.telemetry`.
 8. **Phase 5 — Ship** (user-triggered only). Commit, then **offer to merge into the default branch** (`--auto-merge` merges without asking, local only; `--push` also pushes; headless merges only with `--auto-merge`), ticket → `complete`.
 
@@ -112,7 +112,7 @@ If a repo contains both, odin splits work into per-stack sub-tracks.
 ## Requirements
 
 - Claude Code (any recent version)
-- An Anthropic org with standard (30-day) data retention — the fable elite agents (`*-elite`) return API errors on zero-data-retention orgs
+- An Anthropic org with standard (30-day) data retention — the elite agents' fable rounds (`*-elite`, attempts 5–6) return API errors on zero-data-retention orgs
 - Node 16.7+ (only for the installer)
 - For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code
 

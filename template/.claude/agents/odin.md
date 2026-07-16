@@ -180,7 +180,9 @@ If the trigger does **not** fire: skip the gate. The coder writes tests inline a
 
 A clean `APPROVED` exits Phase 2 immediately with **zero iterations**. The cap is a ceiling, not a target.
 
-**Per track: 4 attempts max — 2 sonnet, then up to 2 fable elite.**
+**Per track: 6 attempts max — 2 sonnet, then up to 2 opus elite, then up to 2 fable elite.**
+
+The elite pair's frontmatter default is `model: fable`. For the opus rung (attempts 3–4), dispatch the elite agents with a `model: opus` override on the `Task` call; the fable rung (attempts 5–6) uses the frontmatter default.
 
 | Stack | Coder |
 |-------|-------|
@@ -245,19 +247,19 @@ Severity:
 
 ### Elite escalation gate
 
-Before spawning the elite pair, all three must be **yes**:
+The ladder has two escalation points: **sonnet → opus elite** (before attempt 3) and **opus elite → fable elite** (before attempt 5). At **each** escalation point, all three must be **yes**:
 
 1. **Is the failure mode reasoning depth?** If the coder *understands* but can't fix because the spec is ambiguous, a stronger model won't help.
-2. **Are the recurring findings actually correct?** Re-read attempt 2's findings critically. If the reviewer is wrong, more rounds produce a more sophisticated wrong conversation.
+2. **Are the recurring findings actually correct?** Re-read the latest attempt's findings critically. If the reviewer is wrong, more rounds produce a more sophisticated wrong conversation.
 3. **Has the loop made any progress?** Zero progress in two rounds means a stronger model won't unstick it.
 
-Any **no** → halt to user with the reason. Don't default to escalation.
+Any **no** → halt to user with the reason. Don't default to escalation. The fable rung is the last resort — if two opus elite rounds produced zero movement, re-run the three-check skeptically rather than escalating by momentum.
 
-If a fable elite dispatch returns a safety refusal (`stop_reason: refusal` — possible on auth/RLS/encryption-heavy tickets), re-dispatch that attempt with `model: opus` rather than halting the ticket. The re-dispatch still counts against the 4-attempt cap.
+If a fable elite dispatch returns a safety refusal (`stop_reason: refusal` — possible on auth/RLS/encryption-heavy tickets), re-dispatch that attempt with `model: opus` rather than halting the ticket. The re-dispatch still counts against the 6-attempt cap.
 
 ### Contract-first check
 
-Before burning fable on `coder-elite`, ask: is the failure in implementation, or in the contract itself? Indicators: the same locked test fails across implementations and seems to assert the wrong thing; the coder emitted `locked_test_disputed`. If contract-first, dispatch `tdd-elite` (counts as part of the same elite round). On `LOOP_VERDICT: CONTRACT_FIXED`, re-enter the standard loop against the new contract.
+Before burning an elite round on `coder-elite` (at either rung), ask: is the failure in implementation, or in the contract itself? Indicators: the same locked test fails across implementations and seems to assert the wrong thing; the coder emitted `locked_test_disputed`. If contract-first, dispatch `tdd-elite` (counts as part of the same elite round). On `LOOP_VERDICT: CONTRACT_FIXED`, re-enter the standard loop against the new contract.
 
 ## Phase 2.5 — Data gate (only if data trigger fires)
 
@@ -265,7 +267,7 @@ Dispatch `data-architect` Mode B against data-touching files. Independent of the
 
 ## Phase 3 — Security gate (only if security trigger fires)
 
-Dispatch `security-review` across changed files. On `STATUS: NEEDS_REMEDIATION` (CRITICAL/HIGH), dispatch a coder fix scoped to the security findings (counts against the same per-track 4-attempt cap), then re-run `security-review` (not full code-review). If still failing after one attempt, mark BLOCKED.
+Dispatch `security-review` across changed files. On `STATUS: NEEDS_REMEDIATION` (CRITICAL/HIGH), dispatch a coder fix scoped to the security findings (counts against the same per-track 6-attempt cap), then re-run `security-review` (not full code-review). If still failing after one attempt, mark BLOCKED.
 
 ## Phase 3.5 — Evaluator (only if evaluator trigger fires)
 
@@ -360,8 +362,12 @@ Hold: synthesized plan, AC list, gate-set decision, locked-tests pointer, per-ph
 ### Attempt History
 - Attempt 1 (sonnet): [findings summary]
 - Attempt 2 (sonnet): [findings summary]
-- Attempt 3 (fable elite): [+ ROOT_CAUSE + DEPARTURE_FROM_PRIOR]
-- Attempt 4 (fable elite): [+ LOOP_VERDICT]
+- Attempt 3 (opus elite): [+ ROOT_CAUSE + DEPARTURE_FROM_PRIOR]
+- Attempt 4 (opus elite): [findings summary]
+- Attempt 5 (fable elite): [+ ROOT_CAUSE + DEPARTURE_FROM_PRIOR]
+- Attempt 6 (fable elite): [+ LOOP_VERDICT]
+
+(Include only the rungs actually reached — an escalation gate that said no ends the history there.)
 
 ### Unresolved Findings
 [file, line, severity, description]

@@ -86,7 +86,7 @@ WHERE id = '<this-ticket-id>';
     "branch": "ticket/t-42",
     "diff": { "files_changed": 7, "insertions": 312, "deletions": 48, "files": ["..."] },
     "tracks": [
-      { "name": "Track 1", "sonnet_attempts": 1, "elite_attempts": 0 }
+      { "name": "Track 1", "sonnet_attempts": 1, "opus_elite_attempts": 0, "fable_elite_attempts": 0 }
     ],
     "gates": {
       "activated": ["data-architect", "tdd", "security-review"],
