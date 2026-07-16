@@ -1,7 +1,7 @@
 ---
 name: coder-elite
-description: "Opus-powered escalation coder. Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles. Handles either web or Flutter — the failing track's stack is already established."
-model: opus
+description: "Fable-powered escalation coder. Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles. Handles either web or Flutter — the failing track's stack is already established."
+model: fable
 color: gold
 ---
 

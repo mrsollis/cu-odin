@@ -180,7 +180,7 @@ If the trigger does **not** fire: skip the gate. The coder writes tests inline a
 
 A clean `APPROVED` exits Phase 2 immediately with **zero iterations**. The cap is a ceiling, not a target.
 
-**Per track: 4 attempts max — 2 sonnet, then up to 2 opus elite.**
+**Per track: 4 attempts max — 2 sonnet, then up to 2 fable elite.**
 
 | Stack | Coder |
 |-------|-------|
@@ -247,15 +247,17 @@ Severity:
 
 Before spawning the elite pair, all three must be **yes**:
 
-1. **Is the failure mode reasoning depth?** If the coder *understands* but can't fix because the spec is ambiguous, opus won't help.
+1. **Is the failure mode reasoning depth?** If the coder *understands* but can't fix because the spec is ambiguous, a stronger model won't help.
 2. **Are the recurring findings actually correct?** Re-read attempt 2's findings critically. If the reviewer is wrong, more rounds produce a more sophisticated wrong conversation.
-3. **Has the loop made any progress?** Zero progress in two rounds means opus won't unstick it.
+3. **Has the loop made any progress?** Zero progress in two rounds means a stronger model won't unstick it.
 
 Any **no** → halt to user with the reason. Don't default to escalation.
 
+If a fable elite dispatch returns a safety refusal (`stop_reason: refusal` — possible on auth/RLS/encryption-heavy tickets), re-dispatch that attempt with `model: opus` rather than halting the ticket. The re-dispatch still counts against the 4-attempt cap.
+
 ### Contract-first check
 
-Before burning opus on `coder-elite`, ask: is the failure in implementation, or in the contract itself? Indicators: the same locked test fails across implementations and seems to assert the wrong thing; the coder emitted `locked_test_disputed`. If contract-first, dispatch `tdd-elite` (counts as part of the same elite round). On `LOOP_VERDICT: CONTRACT_FIXED`, re-enter the standard loop against the new contract.
+Before burning fable on `coder-elite`, ask: is the failure in implementation, or in the contract itself? Indicators: the same locked test fails across implementations and seems to assert the wrong thing; the coder emitted `locked_test_disputed`. If contract-first, dispatch `tdd-elite` (counts as part of the same elite round). On `LOOP_VERDICT: CONTRACT_FIXED`, re-enter the standard loop against the new contract.
 
 ## Phase 2.5 — Data gate (only if data trigger fires)
 
@@ -358,8 +360,8 @@ Hold: synthesized plan, AC list, gate-set decision, locked-tests pointer, per-ph
 ### Attempt History
 - Attempt 1 (sonnet): [findings summary]
 - Attempt 2 (sonnet): [findings summary]
-- Attempt 3 (opus elite): [+ ROOT_CAUSE + DEPARTURE_FROM_PRIOR]
-- Attempt 4 (opus elite): [+ LOOP_VERDICT]
+- Attempt 3 (fable elite): [+ ROOT_CAUSE + DEPARTURE_FROM_PRIOR]
+- Attempt 4 (fable elite): [+ LOOP_VERDICT]
 
 ### Unresolved Findings
 [file, line, severity, description]

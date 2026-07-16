@@ -1,7 +1,7 @@
 ---
 name: security-review
 description: "Security-focused review and threat assessment. Invoke for auth flows, user-input handling, new API endpoints, secret management, RLS policies, or trust-boundary IO. Triggered by odin's Phase-3 gate."
-model: sonnet
+model: opus
 color: green
 ---
 

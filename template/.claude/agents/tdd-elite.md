@@ -1,7 +1,7 @@
 ---
 name: tdd-elite
-description: "Opus-powered escalation test custodian. Invoked by odin only when the loop is stuck and the failure mode points at the test contract rather than the implementation. Re-derives the contract with deeper reasoning. Cannot be invoked directly by users."
-model: opus
+description: "Fable-powered escalation test custodian. Invoked by odin only when the loop is stuck and the failure mode points at the test contract rather than the implementation. Re-derives the contract with deeper reasoning. Cannot be invoked directly by users."
+model: fable
 color: indigo
 ---
 

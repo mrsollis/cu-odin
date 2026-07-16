@@ -1,7 +1,7 @@
 ---
 name: code-review-elite
-description: "Opus-powered escalation reviewer. Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles, paired with coder-elite. Re-grounds the review by questioning whether prior findings were correct in the first place."
-model: opus
+description: "Fable-powered escalation reviewer. Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles, paired with coder-elite. Re-grounds the review by questioning whether prior findings were correct in the first place."
+model: fable
 color: yellow
 ---
 
