@@ -12,7 +12,7 @@
 
 > **Effort-adaptive pipeline.** Odin runs an up-front effort-sizing pass on each ticket (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — to keep small tickets cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, tdd-invariant, and elite-escalation gates fire on their scope triggers regardless of size. Quality, security, and performance are never traded for tokens.
 
-> **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/harness-reuse.md`, `.claude/skills/{add-ticket,process-ticket}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
+> **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/harness-reuse.md`, `.claude/rules/workflow-defaults.md`, `.claude/skills/{add-ticket,process-ticket}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
 
 ## Read first
 
@@ -21,6 +21,8 @@
 | 1 | [.claude/rules/domain.md](.claude/rules/domain.md) | Product, audience, surfaces, the bar to clear |
 | 2 | [.claude/rules/design-system/README.md](.claude/rules/design-system/README.md) | Design philosophy + rule index |
 | 3 | [.claude/agents/odin.md](.claude/agents/odin.md) | Orchestration rules and the conditional gate pipeline |
+
+Quick reminder of the out-of-the-box defaults (no flags, no prompts): [.claude/rules/workflow-defaults.md](.claude/rules/workflow-defaults.md).
 
 ## Stack detection (automatic)
 

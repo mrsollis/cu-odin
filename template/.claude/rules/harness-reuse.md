@@ -7,6 +7,7 @@ CLAUDE.md
 .claude/agents/*.md
 .claude/rules/ticket-schema.md
 .claude/rules/harness-reuse.md
+.claude/rules/workflow-defaults.md
 .claude/rules/design-system/      # folder structure only — replace contents
 .claude/rules/domain.md           # file exists — replace contents
 .claude/skills/{add-ticket,process-ticket}/
