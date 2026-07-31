@@ -4,7 +4,8 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 ## Files
 
-- `schema.sql` — DDL for the `tickets` table. Apply via Supabase migrations or `psql -f`.
+- `schema.sql` — DDL for the `tickets` table. Apply via Supabase migrations or `psql -f`. Complete and current — new installs need only this.
+- `migrations/001_add_images.sql` — incremental upgrade for installs created before the `images` column existed. New installs skip it (see "Migrating an existing install" below).
 
 ## Schema
 
@@ -28,10 +29,39 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 | branch_name | text | e.g. `ticket/t-123` |
 | blocked_reason | text | First-class field; status stays `active` |
 | pr_url | text | Optional |
+| images | jsonb | Up to 5 attachments fed to odin/specialists as visual context (see below). Default `'[]'`. |
 | metadata | jsonb | Orchestrator-reserved keys + project extension slot (see below) |
 | created_at, updated_at, completed_at | timestamptz | Auto-maintained |
 
 `updated_at` auto-updates via trigger. `depends_on` is validated on every INSERT/UPDATE — unknown ids and self-references are rejected.
+
+### Image attachments (`images`)
+
+`images` is a `jsonb` array (default `'[]'`), capped at **5 entries** by a `CHECK` constraint. Attach screenshots, mockups, or reference images to a ticket and the harness feeds them to odin and the relevant specialists as visual context alongside the text description — a bug screenshot to the coder, a design mockup to `ux-design`, and so on.
+
+Each entry is one of two shapes:
+
+**base64** (the zero-infra default — works over the Supabase MCP `execute_sql` tool with no bucket or extra credentials):
+
+```json
+{ "id": "img-1", "source": "base64", "mime": "image/png",
+  "data": "iVBORw0KGgoAAAANS…", "caption": "Login screen shows the error toast",
+  "added_at": "2026-07-31T14:00:00Z" }
+```
+
+`data` is the raw base64 of the file bytes (no `data:image/png;base64,` prefix). Keep each image reasonably small — downscale to ≤ ~1.5 MB before encoding, since base64 inflates bytes ~33% and the row travels over the MCP on every read that selects the column.
+
+**storage ref** (lean rows — bytes live in Supabase Storage; requires you to create a bucket and upload out-of-band, since the MCP has no Storage-upload tool):
+
+```json
+{ "id": "img-1", "source": "storage", "mime": "image/png",
+  "path": "ticket-images/T-42/img-1.png", "caption": "…",
+  "added_at": "2026-07-31T14:00:00Z" }
+```
+
+`path` is bucket-relative. `/add-ticket` accepts either shape; `/process-ticket` materializes both to files under the ticket worktree (`.ticket-images/`) at claim time so vision-capable models can `Read` them. Mixed arrays (some base64, some storage) are fine.
+
+> **Keep base64 out of `SELECT *` in hot paths.** The ready-queue and list queries don't need image bytes. Select `images` only when you actually intend to render or materialize attachments (claim time), or select a lightweight projection like `jsonb_array_length(images) AS image_count` for queue views.
 
 ### Metadata namespace
 
@@ -100,3 +130,15 @@ ORDER BY
 2. Apply `schema.sql`.
 
 That's it — no per-repo config to fill in. The Supabase project id lives in the Supabase MCP server config; nothing else to set.
+
+## Migrating an existing install (add the `images` column)
+
+`schema.sql` already includes the `images` column, so **new installs need nothing extra** — just apply it.
+
+If you adopted cu-odin before the `images` column existed, apply the standalone migration once instead of re-running the whole schema:
+
+```
+migrations/001_add_images.sql
+```
+
+It's idempotent (`add column if not exists` + `drop/add constraint`), adds the ≤ 5 cap, and touches no existing rows. Apply via Supabase migrations, the MCP `apply_migration` tool, or `psql -f migrations/001_add_images.sql`.

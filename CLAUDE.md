@@ -82,6 +82,8 @@ Your design system. Convention is one topic per file with numeric prefixes (`00-
 
 Apply this to your Supabase project (or any Postgres) to set up the `tickets` table that replaces Linear/Jira. Per-ticket history (locked-tests manifest, QA checklist, outcome notes, run telemetry, inter-agent comments) lives in the `metadata` jsonb column — there is no separate comments table.
 
+Tickets can also carry up to **5 image attachments** in an `images` jsonb column (base64 blobs by default — zero infra — or Supabase Storage refs). `/add-ticket` accepts them; `/process-ticket` materializes them into the ticket worktree at claim time; and odin reads them as visual context, routing each into the brief of the specialist it informs (a bug screenshot to the coder, a mockup to `ux-design`). Already applied an older schema? Run `.claude/assets/ticket-system/migrations/001_add_images.sql` — new installs need only `schema.sql`.
+
 The orchestrator reads/writes tickets via the Supabase MCP tool, so make sure that's wired up in your Claude Code config.
 
 ## When to invoke each agent

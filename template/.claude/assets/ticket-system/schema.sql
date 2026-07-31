@@ -31,10 +31,23 @@ create table tickets (
   branch_name     text,                                   -- e.g. 'ticket/t-123'
   blocked_reason  text,                                   -- first-class; status stays 'active'
   pr_url          text,
+  images          jsonb not null default '[]',            -- up to 5 attachments; fed to odin/specialists as visual context. See constraint + shape below.
   metadata        jsonb not null default '{}',            -- orchestrator-reserved keys (outcome, telemetry, qa, locked_tests, cancellation, comments) + project extension slot
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
-  completed_at    timestamptz
+  completed_at    timestamptz,
+
+  -- Attachments are a JSON array, capped at 5 entries. Each entry is one of:
+  --   base64 (zero-infra, default — works over the Supabase MCP execute_sql tool):
+  --     { "id": "img-1", "source": "base64", "mime": "image/png",
+  --       "data": "<base64 bytes, no data: prefix>", "caption": "…", "added_at": "…" }
+  --   storage ref (lean rows; requires a bucket + upload out-of-band):
+  --     { "id": "img-1", "source": "storage", "mime": "image/png",
+  --       "path": "ticket-images/T-42/img-1.png", "caption": "…", "added_at": "…" }
+  -- process-ticket materializes these to files in the ticket worktree so
+  -- vision-capable models can Read them alongside the description.
+  constraint tickets_images_is_array check (jsonb_typeof(images) = 'array'),
+  constraint tickets_images_max_5    check (jsonb_array_length(images) <= 5)
 );
 
 create index tickets_status_idx          on tickets (status);

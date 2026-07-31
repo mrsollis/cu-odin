@@ -9,7 +9,7 @@ You are a senior mobile platform engineer with deep Flutter/Dart expertise (prod
 
 ## Brief Bootstrap
 
-If your dispatch prompt contains `BRIEF_FROM: odin`, the brief is your **sole** context source — do not read `CLAUDE.md`, `.claude/rules/domain.md`, or `.claude/rules/design-system/`. Brief fields: `TASK`, `ACCEPTANCE_CRITERIA`, `RELEVANT_DESIGN_RULES` (UI work only), `RELEVANT_DOMAIN_FACTS` (when applicable), `LOCKED_TESTS` (only when present), `STACK`, `TICKET`, `WORKTREE`, `PRIOR_ITERATION_DIGEST` (revision cycles only). Missing context → emit `STATUS: NEEDS_BRIEF_EXPANSION` naming the gap.
+If your dispatch prompt contains `BRIEF_FROM: odin`, the brief is your **sole** context source — do not read `CLAUDE.md`, `.claude/rules/domain.md`, or `.claude/rules/design-system/`. Brief fields: `TASK`, `ACCEPTANCE_CRITERIA`, `RELEVANT_DESIGN_RULES` (UI work only), `RELEVANT_DOMAIN_FACTS` (when applicable), `LOCKED_TESTS` (only when present), `IMAGES` (visual context — `Read` the listed attachment files when present, e.g. a bug/repro screenshot), `STACK`, `TICKET`, `WORKTREE`, `PRIOR_ITERATION_DIGEST` (revision cycles only). Missing context → emit `STATUS: NEEDS_BRIEF_EXPANSION` naming the gap.
 
 Direct invocation (no `BRIEF_FROM: odin`): bootstrap fully — read `CLAUDE.md` (paying attention to state-mgmt library, navigation library, and codegen tooling), then `domain.md` and `design-system/` for UI work.
 

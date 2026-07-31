@@ -11,9 +11,14 @@ Schema lives in [../assets/ticket-system/schema.sql](../assets/ticket-system/sch
 - `status` — `backlog` | `active` | `qa` | `complete`
 - `category`, `priority`, `tier`, `depends_on`, `files_affected`, `assigned_to`, `assigned_at`, `branch_name`, `blocked_reason`, `completed_at`, `pr_url`
 - `labels` (text[])
+- `images` (jsonb) — up to 5 image attachments (base64 or Supabase Storage refs), fed to odin/specialists as visual context. Shape + cap: [../assets/ticket-system/README.md](../assets/ticket-system/README.md#image-attachments-images).
 - `metadata` (jsonb) — single slot for everything else
 
-A DB trigger validates `depends_on` (rejects unknown ids and self-references). Read/write via Supabase MCP tools, always merging into `metadata` with `||` / `jsonb_set` so reserved keys never clobber project keys.
+A DB trigger validates `depends_on` (rejects unknown ids and self-references). A `CHECK` constraint caps `images` at 5 entries. Read/write via Supabase MCP tools, always merging into `metadata` with `||` / `jsonb_set` so reserved keys never clobber project keys.
+
+## Image attachments (`images`)
+
+Each entry is `{ id, source, mime, caption, added_at }` plus either `data` (base64, `source: "base64"`) or `path` (bucket-relative, `source: "storage"`). Base64 is the zero-infra default — it round-trips over the Supabase MCP `execute_sql` tool with no bucket. `/add-ticket` writes the array; `/process-ticket` materializes it to files under the ticket worktree (`.ticket-images/`) at claim time; odin reads those files (vision) alongside the description and routes the relevant ones into specialist briefs (`IMAGES:` field). Full shape, size guidance, and the migration for existing installs: [../assets/ticket-system/README.md](../assets/ticket-system/README.md#image-attachments-images).
 
 ## Reserved `metadata` keys (orchestrator-managed)
 

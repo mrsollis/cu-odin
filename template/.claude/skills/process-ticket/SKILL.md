@@ -1,7 +1,7 @@
 ---
 name: process-ticket
 description: Pick up, dispatch, and report on tickets from the project's Supabase tickets table. Hands each claimed ticket to @odin for execution, supports per-ticket queue runs and worktree-based parallel cohort orchestration.
-version: 2.1.0
+version: 2.2.0
 ---
 
 # Process Ticket
@@ -116,7 +116,36 @@ Order is load-bearing:
 4. Branch / worktree feasibility — verify `ticket/<id-lower>` is free and `.worktrees/<id-lower>` does not already exist (skip the worktree-path check only under `--no-worktree`).
 5. **Atomic claim SQL** — only after 1–4 pass.
 6. Fresh-pull `<base>`, then create the workspace: `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>` by default, or `git checkout -b ticket/<id-lower>` from a freshly-pulled `<base>` under `--no-worktree`.
-7. Hand to Odin (single-agent: become Odin inline; orchestrate: hold the cohort and dispatch specialists in parallel).
+7. **Materialize ticket images** into the workspace (only when `image_count > 0`) — see "Ticket images → worktree" below.
+8. Hand to Odin (single-agent: become Odin inline; orchestrate: hold the cohort and dispatch specialists in parallel).
+
+## Ticket images → worktree
+
+When a claimed ticket has attachments (`image_count > 0` from the claim `RETURNING`), the dispatcher writes them to files inside the ticket's workspace **before** handing off to Odin, so vision-capable models can `Read` them alongside the text description. Skip this step entirely when `image_count` is 0 (the common case) — no query, no directory.
+
+1. **Fetch the array** for the claimed ticket:
+
+   ```sql
+   SELECT images FROM public.tickets WHERE id = '<id>';
+   ```
+
+2. **Create the image dir** in the workspace and keep it out of the diff: `<worktree>/.ticket-images/`. Add `.ticket-images/` to the worktree's `.gitignore` (or the repo's) so attachments never get committed as part of the ticket's changes.
+
+3. **Write each entry to a file** named `<entry.id>.<ext>` (extension from `mime`, e.g. `image/png` → `.png`) under `.ticket-images/`:
+   - `source: "base64"` — decode `data` and write the bytes. Handle **one image at a time** and do not echo the base64 string back in your narration; it exists only to land on disk.
+   - `source: "storage"` — download the object at `path` from the Supabase Storage bucket to the file (e.g. a signed-URL `curl`). This keeps large images out of model context — one reason to prefer storage refs for big or numerous attachments.
+
+4. **Build the image manifest** — a small list the dispatcher hands to Odin (paths + captions, never bytes):
+
+   ```
+   IMAGES:
+     - { id: img-1, file: .worktrees/t-42/.ticket-images/img-1.png, mime: image/png, caption: "Login screen error toast" }
+     - { id: img-2, file: .worktrees/t-42/.ticket-images/img-2.png, mime: image/png, caption: "Desired empty state" }
+   ```
+
+5. If an entry can't be materialized (unreadable storage object, malformed base64), note it in the manifest with `status: unavailable` and continue — a missing image never blocks the ticket.
+
+In cohort mode this runs per claimed ticket, writing into that ticket's own worktree. The manifest is passed in each ticket's Odin brief.
 
 ## Behavior: no-args / `next` / `--loop` (single-agent path)
 
@@ -152,17 +181,20 @@ WHERE id = (
   FOR UPDATE SKIP LOCKED
 )
 RETURNING id, title, category, priority, tier, effort_estimate, description,
-          depends_on, files_affected;
+          depends_on, files_affected, jsonb_array_length(images) AS image_count;
 ```
+
+`image_count` (not the bytes) rides along in the claim so the dispatcher knows whether to run the image-materialization step below — base64 bytes are fetched only when `image_count > 0`, and never echoed back into narrative context.
 
 - Priority: critical > high > medium > low. Tie-break: tier ASC, then FIFO.
 - If no ready ticket, report queue state. In `--loop`, exit the loop.
 
-4. **Workspace:** default is a fresh per-ticket worktree — ensure `.worktrees/` exists and is git-ignored (add to `.gitignore` if missing), then fresh-pull `<base>` and `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>`. Under `--no-worktree`, `git checkout -b ticket/<id-lower>` from a freshly-pulled `<base>` in the main tree instead.
+4. **Workspace:** default is a fresh per-ticket worktree — ensure `.worktrees/` exists and is git-ignored (add to `.gitignore` if missing), then fresh-pull `<base>` and `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>`. Under `--no-worktree`, `git checkout -b ticket/<id-lower>` from a freshly-pulled `<base>` in the main tree instead. Then, if `image_count > 0`, **materialize ticket images** into the workspace (see "Ticket images → worktree").
 
 5. **Become Odin inline.** Read [.claude/agents/odin.md](../../agents/odin.md) and run the pipeline yourself in this same top-level session, dispatching specialists via `Task`. Carry into the run:
    - The ticket id and full description.
    - The ticket's sizing signals — `effort_estimate`, `tier`, `category`, `files_affected` (from the claim `RETURNING`) — so Odin can run its effort-sizing pass.
+   - The **image manifest** (paths + captions) when the ticket has attachments, so Odin can read them as visual context and route relevant ones into specialist briefs.
    - `WORKTREE: .worktrees/<id-lower>` by default, or `WORKTREE: .` under `--no-worktree`.
    - The session mode (interactive/headless).
    - "Ticket already claimed; workspace already created. Skip ticket-creation steps. Run through QA handoff (Phase 4). Do not ship — the dispatcher manages commit and the user controls Phase 5 (in interactive mode) or auto-mode pre-authorization triggers Phase 5."
@@ -204,8 +236,9 @@ Repeat until the queue is empty OR fewer than 1 ticket is ready (in `--loop`, ke
 
 3. **For each claimed ticket, create a fresh worktree off the freshly-pulled base:**
    - `git worktree add .worktrees/<id-lower> -b ticket/<id-lower> origin/<base>`
+   - Then, if that ticket's `image_count > 0`, materialize its images into `.worktrees/<id-lower>/.ticket-images/` (see "Ticket images → worktree"). Each ticket's manifest goes into its own Odin brief.
 
-4. **Become Odin in cohort mode.** Read [.claude/agents/odin.md](../../agents/odin.md) and follow the "Cohort coordination" section. Hold cohort state as a structured map. For each phase, dispatch one specialist `Task` per ticket in a single message. Each `Task` brief includes `WORKTREE: .worktrees/<id-lower>` (so the specialist's `Bash`/`Read`/`Edit` calls scope to that worktree) and the ticket's sizing signals (`effort_estimate`, `tier`, `category`, `files_affected`) so Odin can size each ticket.
+4. **Become Odin in cohort mode.** Read [.claude/agents/odin.md](../../agents/odin.md) and follow the "Cohort coordination" section. Hold cohort state as a structured map. For each phase, dispatch one specialist `Task` per ticket in a single message. Each `Task` brief includes `WORKTREE: .worktrees/<id-lower>` (so the specialist's `Bash`/`Read`/`Edit` calls scope to that worktree), the ticket's sizing signals (`effort_estimate`, `tier`, `category`, `files_affected`) so Odin can size each ticket, and the ticket's image manifest when it has attachments.
 
 5. **Cohort failure isolation.** When one ticket's `Task` returns `STATUS: BLOCKED` or `STATUS: NEEDS_BRIEF_EXPANSION`, record the state on that ticket and continue the cohort's other tickets in the same phase. One bad ticket never freezes the cohort.
 
@@ -362,10 +395,10 @@ SET status = 'active',
     labels = array_append(array_remove(labels, 'Exec: Active'), 'Exec: Active')
 WHERE id = '<id>'
   AND status = 'backlog'
-RETURNING id, title;
+RETURNING id, title, jsonb_array_length(images) AS image_count;
 ```
 
-The `AND status = 'backlog'` guard prevents double-assignment.
+The `AND status = 'backlog'` guard prevents double-assignment. As with the auto-claim path, materialize images into the worktree when `image_count > 0` before handing to Odin.
 
 ### Append progress / notes
 Append a comment object to `metadata.comments` (do **not** mutate the description). One element per note. Schema for each element: `{ author, when, body }` — `author` is the agent/role posting (e.g. `odin`, `coder-web`, `tdd`, `data-architect`, `dispatcher`).

@@ -9,7 +9,7 @@ You are a senior code reviewer with deep experience across mission-critical syst
 
 ## Brief Bootstrap
 
-If your dispatch prompt contains `BRIEF_FROM: odin`, the brief is your **sole** context source. Brief fields: `TASK`, `ACCEPTANCE_CRITERIA`, `RELEVANT_DESIGN_RULES` (UI work only), `RELEVANT_DOMAIN_FACTS` (when applicable), `LOCKED_TESTS` (only when present), `STACK`, `TICKET`, `WORKTREE`, `PRIOR_ITERATION_DIGEST` (revision cycles only). Missing context → emit `STATUS: NEEDS_BRIEF_EXPANSION`.
+If your dispatch prompt contains `BRIEF_FROM: odin`, the brief is your **sole** context source. Brief fields: `TASK`, `ACCEPTANCE_CRITERIA`, `RELEVANT_DESIGN_RULES` (UI work only), `RELEVANT_DOMAIN_FACTS` (when applicable), `LOCKED_TESTS` (only when present), `IMAGES` (visual context — `Read` the listed attachment files when present, e.g. a mockup to check the implementation against), `STACK`, `TICKET`, `WORKTREE`, `PRIOR_ITERATION_DIGEST` (revision cycles only). Missing context → emit `STATUS: NEEDS_BRIEF_EXPANSION`.
 
 Direct invocation: read `CLAUDE.md` for orientation.
 

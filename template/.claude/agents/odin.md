@@ -81,10 +81,13 @@ ACCEPTANCE_CRITERIA: [AC-1 ...]
 RELEVANT_DESIGN_RULES:    # omit on backend-only work
 RELEVANT_DOMAIN_FACTS:    # omit when not needed
 RELEVANT_AUTH_MODEL:      # security-review only
+IMAGES:                   # omit when the ticket has no attachments or none are relevant to this specialist
 LOCKED_TESTS:             # omit when tdd was skipped
 PRIOR_ITERATION_DIGEST:   # omit on iteration 1
 ODIN_HYPOTHESIS:          # elite escalation only
 ```
+
+`IMAGES` lists only the attachment files relevant to *this* specialist, as `{ file, caption }` — the coder gets the bug screenshot, `ux-design` gets the mockup, and so on. Pass the file paths (from the dispatcher's manifest), not the bytes; the specialist `Read`s them. Omit the field for specialists an image doesn't inform.
 
 Examples:
 
@@ -123,6 +126,10 @@ The digest is the reward signal back to the coder. Carry **prior scores** and **
 Dispatch `ux-design`. Wait for `STATUS: SPEC_COMPLETE` before proceeding. On `STATUS: NEEDS_INPUT`, relay open questions and wait.
 
 ## Phase 1 — Planning
+
+### Ticket images (read first when present)
+
+If the dispatcher's handoff includes an image manifest, `Read` those files at intake — before sizing and planning — and fold what they show into your understanding of the ticket. A screenshot often carries the acceptance signal the text only gestures at (the exact broken state, the intended layout, the error copy). Treat images as first-class ticket context: reference them when authoring acceptance criteria, and route each one into the brief of the specialist it informs via the `IMAGES` field (mockups → `ux-design`; bug/repro shots → the coder; a diagram of a data shape → `data-architect`). Don't forward an image to a specialist it doesn't inform. If a manifest entry is marked `status: unavailable`, note it and proceed on the text alone.
 
 ### Effort sizing (do this first)
 

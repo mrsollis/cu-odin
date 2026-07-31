@@ -38,7 +38,7 @@ Supabase Auth + Row-Level Security. Every new table needs RLS policies; `securit
 
 ## Ticket system
 
-Tickets live in Supabase. Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project.
+Tickets live in Supabase. Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project. Tickets support up to 5 image attachments (`images` jsonb column) that odin and the specialists read as visual context; upgrading an older install is a one-file migration ([.claude/assets/ticket-system/migrations/001_add_images.sql](.claude/assets/ticket-system/migrations/001_add_images.sql)).
 
 - [/add-ticket](.claude/skills/add-ticket/SKILL.md) — file a new ticket.
 - [/process-ticket](.claude/skills/process-ticket/SKILL.md) — claim, dispatch to `@odin`. Supports `--loop`, `--orchestrate N`, filters, `--dry-run`, and the worktree/merge flags `--no-worktree`, `--branch <name>`, `--auto-merge`, `--push`. Push and ticket completion are user-triggered Phase 5 only.
