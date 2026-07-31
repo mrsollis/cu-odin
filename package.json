@@ -8,7 +8,6 @@
   "files": [
     "bin",
     "template",
-    "README.md",
     "LICENSE"
   ],
   "engines": {

@@ -1,0 +1,26 @@
+-- Migration 002 — enable Row-Level Security on public.tickets
+--
+-- Apply this to any project that was created from an OLDER schema.sql that did
+-- not enable RLS. New projects created from the current schema.sql already have
+-- RLS enabled and do NOT need this migration (running it anyway is harmless).
+--
+-- Why: on Supabase, any table in the `public` schema is auto-exposed through the
+-- PostgREST API using the *publishable* (anon) key, which is public by design.
+-- Without RLS, anyone who knows the project URL + anon key could read and write
+-- every ticket. Ticket descriptions and metadata are fed to the orchestrator as
+-- instructions, so write access to this table is a prompt-injection channel into
+-- an autonomous coding agent, and read access leaks internal file paths, outcome
+-- notes, and telemetry.
+--
+-- Effect: enabling RLS with **no policies** denies all access to the anon and
+-- authenticated roles (PostgREST returns nothing / rejects writes). The Supabase
+-- MCP server the orchestrator uses connects as `service_role`, which has the
+-- BYPASSRLS attribute, so odin and /process-ticket keep full access.
+--
+-- Verify after applying:
+--   select relrowsecurity from pg_class where relname = 'tickets';  -- expect: t
+--   select count(*) from pg_policies where tablename = 'tickets';   -- expect: 0
+--
+-- Idempotent: `enable row level security` is a no-op if RLS is already on.
+
+alter table public.tickets enable row level security;

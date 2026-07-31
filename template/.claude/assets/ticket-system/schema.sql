@@ -56,6 +56,27 @@ create index tickets_labels_gin          on tickets using gin (labels);
 create index tickets_depends_on_gin      on tickets using gin (depends_on);
 create index tickets_files_affected_gin  on tickets using gin (files_affected);
 
+-- Row-Level Security: lock the table down by default.
+--
+-- On Supabase, any table in the `public` schema is auto-exposed through the
+-- PostgREST API using the *publishable* (anon) key, which is public by design.
+-- Without RLS, anyone who knows the project URL + anon key could read and write
+-- every ticket. That is a real exposure: ticket descriptions and metadata are
+-- fed to the orchestrator as instructions, so write access to this table is a
+-- prompt-injection channel into an autonomous coding agent, and read access
+-- leaks internal file paths, outcome notes, and telemetry.
+--
+-- Enabling RLS with **no policies** denies all access to the anon and
+-- authenticated roles (PostgREST returns nothing / rejects writes). The
+-- Supabase MCP server the orchestrator uses connects as `service_role`, which
+-- has the BYPASSRLS attribute, so odin and /process-ticket keep full access.
+--
+-- If you ever need to reach tickets from a browser/client with the anon key,
+-- add narrowly-scoped policies here deliberately — do NOT leave RLS off. This
+-- table is a trust boundary: whoever can INSERT/UPDATE a ticket can steer the
+-- agent pipeline.
+alter table tickets enable row level security;
+
 create or replace function set_updated_at() returns trigger
 language plpgsql as $$
 begin

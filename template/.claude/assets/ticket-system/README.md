@@ -4,8 +4,22 @@ Portable schema and conventions for the orchestration agent's ticket tracker. Dr
 
 ## Files
 
-- `schema.sql` — DDL for the `tickets` table. Apply via Supabase migrations or `psql -f`. Complete and current — new installs need only this.
+- `schema.sql` — complete DDL for the `tickets` table (greenfield). Apply via Supabase migrations or `psql -f`. Complete and current — new installs need only this (RLS enabled, `images` column included).
 - `migrations/001_add_images.sql` — incremental upgrade for installs created before the `images` column existed. New installs skip it (see "Migrating an existing install" below).
+- `migrations/002_enable_rls.sql` — for projects created from an **older** `schema.sql` that predates RLS. New installs skip it (running it anyway is harmless).
+
+## Security posture (read this)
+
+The `tickets` table is a **trust boundary**: whoever can INSERT/UPDATE a ticket can steer the agent pipeline, because ticket `description`/`metadata` is fed to [@odin](../../agents/odin.md) as instructions. `schema.sql` therefore enables **Row-Level Security with no policies**, which denies all access to the Supabase `anon`/`authenticated` roles (the anon key is public by design and would otherwise expose every ticket through the PostgREST API). The orchestrator's Supabase MCP connection uses `service_role`, which bypasses RLS, so nothing breaks.
+
+If you created your project before RLS shipped, apply `migrations/002_enable_rls.sql`. Verify with:
+
+```sql
+select relrowsecurity from pg_class where relname = 'tickets';  -- expect: t
+select count(*) from pg_policies where tablename = 'tickets';   -- expect: 0
+```
+
+Only add policies if you deliberately need client (anon-key) access — never leave RLS off.
 
 ## Schema
 
@@ -127,7 +141,8 @@ ORDER BY
 ## Adopting in a new repo
 
 1. Create a Supabase project (or use any Postgres).
-2. Apply `schema.sql`.
+2. Apply `schema.sql` (it already enables RLS — see Security posture above).
+3. If you're updating a project created from an older schema, apply the relevant `migrations/*.sql` too (`001_add_images.sql`, `002_enable_rls.sql`).
 
 That's it — no per-repo config to fill in. The Supabase project id lives in the Supabase MCP server config; nothing else to set.
 
