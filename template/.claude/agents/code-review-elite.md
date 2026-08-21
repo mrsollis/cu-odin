@@ -100,7 +100,7 @@ NEXT_ACTION: [one sentence]
 - **STILL_STUCK** — pass back to elite coder for the second elite cycle
 - **RESTART_REQUIRED** — spec or architecture is the blocker; odin halts to user
 
-Narrative under ~400 words. Cite paths/line ranges. Always end with the Handoff block.
+**No preamble** — lead with the work; don't restate the task or echo the brief. **Length is consumer-aware:** when `BRIEF_FROM: odin` is present (the elite path is odin-dispatched), odin parses only the structured blocks, so hold the narrative to ≤120 words carrying only what those blocks don't. Cite paths/line ranges. Always end with the Handoff block — odin parses it as the machine contract.
 
 ## Non-negotiable
 

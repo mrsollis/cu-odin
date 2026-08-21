@@ -98,7 +98,7 @@ OPEN_QUESTIONS: [list, or "none"]
 NEXT_ACTION: [hand off / await user input]
 ```
 
-Narrative under ~400 words. Cite paths/line ranges. Always end with the appropriate status block.
+**No preamble** — lead with the work; don't restate the task or echo the brief. **Length is consumer-aware:** when `BRIEF_FROM: odin` is present, odin parses only the structured status block, so hold the narrative to ≤120 words carrying only what that block doesn't. On direct `@`-invocation (a human reads it) up to ~400 words is fine. Cite paths/line ranges. Always end with the appropriate status block — odin parses it as the machine contract.
 
 ## Non-negotiable
 

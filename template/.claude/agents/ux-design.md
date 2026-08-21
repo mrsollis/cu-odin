@@ -148,7 +148,7 @@ DELIVERABLES: [components/pages specified]
 NEXT_ACTION: [instruction for the coder, or question for the user]
 ```
 
-Narrative under ~400 words excluding spec blocks. Cite paths. Always end with the Handoff block.
+**No preamble** — lead with the work; don't restate the task or echo the brief. **Length is consumer-aware (narrative only — the spec blocks are the deliverable and are always full):** when `BRIEF_FROM: odin` is present, hold the surrounding narrative to ≤120 words. On direct `@`-invocation up to ~400 words (excluding spec blocks) is fine. Cite paths. Always end with the Handoff block.
 
 ## Non-negotiable
 

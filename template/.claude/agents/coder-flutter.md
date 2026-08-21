@@ -71,7 +71,7 @@ FILES_CHANGED: [paths]
 NEXT_ACTION: [one sentence]
 ```
 
-Narrative under ~400 words. Cite paths/line ranges. Don't echo the brief. Findings structured. Always end with the Handoff block.
+**No preamble** — lead with the work; don't restate the task or echo the brief. **Length is consumer-aware:** when `BRIEF_FROM: odin` is present, odin parses only the structured blocks, so hold the narrative to ≤120 words carrying only what those blocks don't. On direct `@`-invocation (a human reads it) up to ~400 words is fine. Cite paths/line ranges. Findings structured. Always end with the Handoff block — odin parses it as the machine contract.
 
 ## Non-negotiable
 

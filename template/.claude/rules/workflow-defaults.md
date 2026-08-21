@@ -44,6 +44,8 @@ One-page reference for the **out-of-the-box** behavior of the dispatcher and the
 
 ### Posture
 - Coordinates specialists via `Task`; **never writes, runs, or reviews code itself.** Never `Task(subagent_type=odin)`.
+- **Top-level only, fail fast.** If `Task` is absent from odin's tool list, odin is nested (e.g. dispatched via `Task(subagent_type=odin)`) and cannot orchestrate — it emits `STATUS: HARNESS_ERROR` with the "run at the session top level / invoke specialists directly" remediation and halts, rather than attempting to orchestrate and stalling.
+- **Blocking, single continuous turn.** Odin awaits every specialist `Task` inline and runs plan → coder → review → security → QA handoff straight through to a terminal state (QA handoff, halt-to-user, or explicit blocker) in **one turn**. It never spawns a specialist as a background child and yields its turn to wait for an async wakeup — "wait for `STATUS: X`" means await the `Task` result in the same turn. Parallel dispatch (planners, per-track tdd, cohort batches) issues all calls in one message and awaits the whole batch before advancing.
 - Interactive default: posts the plan + activated gate set and **waits for approval**. Headless: proceeds without operational prompts (safety gates still run).
 
 ### Conditional pipeline (the default cost lever)
