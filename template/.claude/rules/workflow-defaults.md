@@ -84,6 +84,7 @@ Every gate has a trigger evaluated against planned scope; **gates fire only on m
 ### Context discipline (default operating principle)
 - Holds: synthesized plan, AC list, gate-set decision, locked-tests pointer, per-phase digests, ticket id, attempt state, advisory findings.
 - Does **not** hold: raw subagent transcripts, file bodies, test-output dumps, full diffs. Passes paths and brief slices, never contents.
+- **Output:** no preamble or prose narration, and never echoes specialist handoffs — but emits a **one-line heartbeat** as each phase starts and clears (`→ security-review…`, `✓ security-review — secure`) so the run never goes silently dark between the plan post and QA handoff.
 
 ### Image attachments (default when present)
 - A ticket may carry ≤ 5 images (`images` column). When the dispatcher's handoff includes an image manifest, odin **reads them at intake** — before sizing/planning — and routes each into the brief of the specialist it informs (bug shot → coder, mockup → ux-design, data diagram → data-architect). No attachments → nothing changes.
