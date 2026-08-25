@@ -12,7 +12,9 @@
 
 > **Effort-adaptive pipeline.** Odin runs an up-front effort-sizing pass on each ticket (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — to keep small tickets cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, tdd-invariant, and elite-escalation gates fire on their scope triggers regardless of size. Quality, security, and performance are never traded for tokens.
 
-> **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/harness-reuse.md`, `.claude/rules/workflow-defaults.md`, `.claude/skills/{add-ticket,process-ticket}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
+> **Cheaper by default.** [.claude/skills/cheaper/SKILL.md](.claude/skills/cheaper/SKILL.md) is active from the start of every session: strip responses to the bare answer — no preamble, recap, follow-up offers, or unrequested features. This governs conversational responses; it never overrides odin's orchestration gates, the plan post, or required safety output. Deactivate only if the user says "stop using cheaper".
+
+> **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/harness-reuse.md`, `.claude/rules/workflow-defaults.md`, `.claude/skills/{add-ticket,process-ticket,cheaper}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
 
 ## Read first
 
