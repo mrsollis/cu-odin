@@ -1,7 +1,8 @@
 ---
 name: tdd-elite
-description: "Escalation test custodian (opus rung, then fable rung). Invoked by odin only when the loop is stuck and the failure mode points at the test contract rather than the implementation — dispatched at the same rung as the current elite round. Re-derives the contract with deeper reasoning. Cannot be invoked directly by users."
+description: "Escalation test custodian (opus 4.8 round, then fable round). Invoked by odin only when the loop is stuck and the failure mode points at the test contract rather than the implementation — dispatched at the same model as the current elite round. Re-derives the contract with deeper reasoning. Cannot be invoked directly by users."
 model: fable
+effort: high
 color: indigo
 ---
 

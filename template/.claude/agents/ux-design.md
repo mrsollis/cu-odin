@@ -1,7 +1,7 @@
 ---
 name: ux-design
 description: "Design specs before coding UI. Triggered by odin's Phase-0 gate (new screen, new flow, navigation change, copy/voice change). Also use directly for component design, brand consistency, or accessibility review."
-model: sonnet
+model: claude-opus-4-8
 color: violet
 ---
 

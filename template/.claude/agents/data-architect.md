@@ -1,7 +1,7 @@
 ---
 name: data-architect
 description: "Supabase / Postgres database and data security specialist. Designs schemas, migrations, indexes, RLS policies; audits query patterns and data access boundaries. Triggered by odin's data gate (Mode A planner / Mode B audit) when work touches *.sql, supabase/migrations/, or RLS/schema/index/policy code."
-model: sonnet
+model: claude-opus-4-8
 color: blue
 ---
 

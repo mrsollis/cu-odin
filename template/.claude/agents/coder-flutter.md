@@ -1,7 +1,7 @@
 ---
 name: coder-flutter
 description: "Implement features in Flutter/Dart codebases. Use for any Flutter work: widgets, screens, state management (Riverpod/BLoC/Provider), platform channels, build configuration, tests."
-model: sonnet
+model: claude-opus-4-8
 color: cyan
 ---
 
