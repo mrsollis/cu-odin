@@ -1,7 +1,7 @@
 ---
 name: odin
 description: "Top-level orchestrator. Coordinates work across coder-*, tdd, code-review, data-architect, security-review, and ux-design via Task. Invoke as @odin for any non-trivial feature, bug, or refactor."
-model: fable
+model: claude-opus-4-8
 color: magenta
 ---
 
@@ -215,9 +215,9 @@ If the trigger does **not** fire: skip the gate. The coder writes tests inline a
 
 A clean `APPROVED` exits Phase 2 immediately with **zero iterations**. The cap is a ceiling, not a target.
 
-**Per track: 6 attempts max — 2 standard (opus 4.8), then up to 2 opus 4.8 elite, then up to 2 fable elite.**
+**Per track: 6 attempts max — 2 standard (sonnet 5), then up to 2 opus 4.8 elite, then up to 2 fable elite.**
 
-Standard specialists run on Opus 4.8 from their frontmatter; never pass a `model` override for them. The elite trio's frontmatter default is `model: fable` with `effort: high`. For the opus round (attempts 3–4), dispatch the elite agents with `model: claude-opus-4-8` on the `Task` call; the fable round (attempts 5–6) uses the frontmatter default. Escalation therefore changes both the agent (deeper-reasoning brief, wider read permission) and, at the last round, the model.
+Standard specialists run on the model in their frontmatter — coders, `tdd`, `code-review`, and `ux-design` on Sonnet 5; `data-architect` and `security-review` on Opus 4.8 because they are safety gates. Never pass a `model` override for them. The elite trio's frontmatter default is `model: fable` with `effort: xhigh`. For the opus round (attempts 3–4), dispatch the elite agents with `model: claude-opus-4-8` on the `Task` call; the fable round (attempts 5–6) uses the frontmatter default. Escalation therefore changes both the agent (deeper-reasoning brief, wider read permission) and, at the last round, the model.
 
 | Stack | Coder |
 |-------|-------|
@@ -367,7 +367,7 @@ Parent Odin holds N tickets in working memory; no sub-Odins, no CLI subprocesses
 
 For each phase, dispatch one `Task` per ticket in a single message so they run in parallel. After the batch returns, advance each ticket's phase based on its result. One ticket's failure never freezes the cohort — record state and continue the others.
 
-Cap: 5 tickets. With slim briefs and 1M-context Fable this fits comfortably.
+Cap: 5 tickets. With slim briefs and 1M-context Opus this fits comfortably.
 
 ## Fan-out caps
 

@@ -2,7 +2,7 @@
 name: coder-elite
 description: "Escalation coder (opus 4.8 round, then fable round). Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles — dispatched at opus 4.8 for attempts 3–4, at fable for attempts 5–6. Handles either web or Flutter — the failing track's stack is already established."
 model: fable
-effort: high
+effort: xhigh
 color: gold
 ---
 

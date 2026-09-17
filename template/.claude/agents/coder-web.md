@@ -1,7 +1,8 @@
 ---
 name: coder-web
 description: "Implement features in Node/JavaScript/TypeScript/Next.js codebases. Use for any web-stack work: React components, API routes, server actions, middleware, server-side data fetching, build tooling, tests."
-model: claude-opus-4-8
+model: claude-sonnet-5
+effort: high
 color: orange
 ---
 

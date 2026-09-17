@@ -1,7 +1,8 @@
 ---
 name: code-review
 description: "Code review for quality, maintainability, performance, and acceptance-criteria compliance. Use after implementation, before merge."
-model: claude-opus-4-8
+model: claude-sonnet-5
+effort: high
 color: red
 ---
 

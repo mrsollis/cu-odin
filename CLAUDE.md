@@ -1,6 +1,6 @@
 # cu-odin
 
-Drop-in Claude Code agent harness. One command installs a Fable-led orchestrator (`odin`) and a roster of specialized subagents into any repo.
+Drop-in Claude Code agent harness. One command installs an Opus-led orchestrator (`odin`) and a roster of specialized subagents into any repo.
 
 ```sh
 npx -y github:mrsollis/cu-odin
@@ -16,17 +16,17 @@ That's it. The installer asks three quick questions (stub in domain? stub in des
 CLAUDE.md
 .claude/
 ├── agents/
-│   ├── odin.md                  # orchestrator (fable) — auto-loaded by CLAUDE.md
-│   ├── coder-web.md             # Node/TS/Next.js implementer (opus 4.8)
-│   ├── coder-flutter.md         # Dart/Flutter implementer (opus 4.8)
+│   ├── odin.md                  # orchestrator (opus 4.8) — auto-loaded by CLAUDE.md
+│   ├── coder-web.md             # Node/TS/Next.js implementer (sonnet 5)
+│   ├── coder-flutter.md         # Dart/Flutter implementer (sonnet 5)
 │   ├── coder-elite.md           # escalation coder (gated; opus 4.8 → fable)
-│   ├── code-review.md           # standard reviewer (opus 4.8)
+│   ├── code-review.md           # standard reviewer (sonnet 5)
 │   ├── code-review-elite.md     # escalation reviewer (gated; opus 4.8 → fable)
-│   ├── tdd.md                   # test custodian — writes & locks the test contract (opus 4.8)
+│   ├── tdd.md                   # test custodian — writes & locks the test contract (sonnet 5)
 │   ├── tdd-elite.md             # escalation custodian (gated; opus 4.8 → fable)
 │   ├── data-architect.md        # Supabase schema / RLS / data security (opus 4.8)
 │   ├── security-review.md       # OWASP-focused review (opus 4.8)
-│   └── ux-design.md             # design spec producer (opus 4.8)
+│   └── ux-design.md             # design spec producer (sonnet 5)
 ├── rules/
 │   ├── domain.md                # PLACEHOLDER — fill in your project brief
 │   └── design-system/           # PLACEHOLDER — drop your design system here
@@ -46,7 +46,7 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Odin authors a flat list of acceptance criteria into `metadata.acceptance_criteria`; this is what `tdd` anchors locked tests to and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
 3. **Phase 1.5 — Test contract.** Per-track `tdd` writes failing tests anchored to acceptance criteria, security invariants, and (when relevant) data invariants, then locks the test files by SHA-256 into the ticket's `metadata.locked_tests`. Coders cannot modify locked tests; the reviewer recomputes the hashes every cycle. This is the structural fix to the "AI weakens the failing test instead of fixing the code" failure mode — the implementer literally does not own the contract.
-4. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **6 total attempts per track** (2 standard on Opus 4.8, then up to 2 Opus 4.8 elite, then up to 2 Fable elite — each escalation round gated separately). If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
+4. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **6 total attempts per track** (2 standard on Sonnet 5, then up to 2 Opus 4.8 elite, then up to 2 Fable elite — each escalation round gated separately). If the failure looks like a contract bug rather than an implementation bug, odin routes to `tdd-elite` first.
 5. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
 6. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 6-attempt cap.
 7. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` (authored by odin from the run transcripts) alongside structured run telemetry in `metadata.telemetry`.
@@ -114,7 +114,7 @@ If a repo contains both, odin splits work into per-stack sub-tracks.
 ## Requirements
 
 - Claude Code (any recent version)
-- An Anthropic org with standard (30-day) data retention — odin and the elite agents' fable round (attempts 5–6) run on Fable, which returns API errors on zero-data-retention orgs
+- An Anthropic org with standard (30-day) data retention — the elite agents' fable round (attempts 5–6) runs on Fable, which returns API errors on zero-data-retention orgs
 - Node 16.7+ (only for the installer)
 - For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code
 

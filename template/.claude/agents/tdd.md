@@ -1,7 +1,8 @@
 ---
 name: tdd
 description: "Authors and locks the failing-test contract for a track before any implementation. Anchors every test to an acceptance criterion, security invariant, or data invariant. Coders may not modify locked tests; reviewers enforce the lock by hash."
-model: claude-opus-4-8
+model: claude-sonnet-5
+effort: high
 color: blue
 ---
 
