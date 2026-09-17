@@ -1,6 +1,6 @@
 # Project harness (Claude agent system)
 
-> **Operating mode.** For any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules. You are odin by default — coordinate work across specialist subagents (`coder-*`, `tdd`, `code-review`, `data-architect`, `security-review`, `ux-design`) rather than implementing yourself. Trivial requests (one-line questions, single typo fixes, file reads) bypass orchestration.
+> **Operating mode.** For any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules. You are odin by default — coordinate work across specialist subagents (`coder-*`, `code-review`, `data-architect`, `security-review`, `ux-design`) rather than implementing yourself. Trivial requests (one-line questions, single typo fixes, file reads) bypass orchestration.
 
 > **Top-level only.** Odin runs at the top level of the session — the only place `Task` is available — and dispatches every specialist via `Task`. Never call `Task(subagent_type=odin)`. Cohort parallelism (`/process-ticket --orchestrate N`) issues parallel `Task` calls within the parent session; there are no sub-Odins or `claude` CLI subprocesses.
 
@@ -10,7 +10,7 @@
 
 > **Worktree by default.** Every ticket runs in its own fresh git worktree under `.worktrees/<id>/`, branched off a freshly-pulled base — the detected default branch (not assumed to be `main`), or `--branch <name>`. `--no-worktree` runs a single ticket in-place instead. On successful ship the dispatcher **offers** to merge into the default branch; `--auto-merge` merges without asking (local only), and `--push` pushes the default branch after merging. In headless mode nothing merges unless `--auto-merge` is set.
 
-> **Effort-adaptive pipeline.** Odin runs an up-front effort-sizing pass on each ticket (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — to keep small tickets cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, tdd-invariant, and elite-escalation gates fire on their scope triggers regardless of size. Quality, security, and performance are never traded for tokens.
+> **Effort-adaptive pipeline.** Odin runs an up-front effort-sizing pass on each ticket (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — to keep small tickets cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, and elite-escalation gates fire on their scope triggers regardless of size. Quality, security, and performance are never traded for tokens.
 
 > **Cheaper by default.** [.claude/skills/cheaper/SKILL.md](.claude/skills/cheaper/SKILL.md) is active from the start of every session: strip responses to the bare answer — no preamble, recap, follow-up offers, or unrequested features. This governs conversational responses; it never overrides odin's orchestration gates, the plan post, or required safety output. Deactivate only if the user says "stop using cheaper".
 
@@ -53,13 +53,12 @@ Tickets live in Supabase. Schema, reserved metadata keys, and Phase-4/5 SQL temp
 |-------|------|
 | [odin](.claude/agents/odin.md) | Default orchestrator. Spawn for any non-trivial feature, bug fix, or refactor. |
 | [ux-design](.claude/agents/ux-design.md) | Triggered by Phase-0 gate (new screen / flow / nav / copy change). |
-| [tdd](.claude/agents/tdd.md) | Triggered by Phase-1.5 gate (security/data invariant, regression-risk fix, or user-requested). |
 | [coder-web](.claude/agents/coder-web.md) / [coder-flutter](.claude/agents/coder-flutter.md) | Stack-routed implementer. |
 | [code-review](.claude/agents/code-review.md) | After every coder pass. Inline review on small scope, separate-context on >10 files or cross-cutting. |
 | [data-architect](.claude/agents/data-architect.md) | Triggered when the diff or plan touches `*.sql`, `supabase/migrations/`, or RLS/schema/index/policy code. Mode A planner + Mode B audit. |
 | [security-review](.claude/agents/security-review.md) | Triggered by auth code, session/token handling, new public route, new RLS, secret handling, trust-boundary IO. |
 
-`*-elite` agents (`coder-elite`, `code-review-elite`, `tdd-elite`) are reserved for odin escalation — don't invoke directly.
+`*-elite` agents (`coder-elite`, `code-review-elite`) are reserved for odin escalation — don't invoke directly.
 
 ## Reusing this harness in a new project
 

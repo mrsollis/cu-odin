@@ -215,7 +215,7 @@ The dispatcher orchestrates up to **N tickets in parallel inside this same sessi
 
 > **Why subagents, not CLI processes.** Subagents (the `Task` tool) are the right primitive for cohort parallelism. There are no separate `claude` processes to spawn, no permission prompts to stall on, no status files to poll. The "halted for an hour" failure mode is structurally impossible — there is nothing to halt.
 >
-> **No sub-Odins.** Odin is never a `Task` target. The parent session is always the only Odin. Specialists (`coder-web`, `coder-flutter`, `tdd`, `code-review`, `data-architect`, `security-review`, `ux-design`, plus the `*-elite` triplet) are the Task targets. Subagents don't fan out further — they do their work directly. The "subagents can't spawn subagents" constraint never bites because the only fan-out point is the parent.
+> **No sub-Odins.** Odin is never a `Task` target. The parent session is always the only Odin. Specialists (`coder-web`, `coder-flutter`, `code-review`, `data-architect`, `security-review`, `ux-design`, plus the `*-elite` pair) are the Task targets. Subagents don't fan out further — they do their work directly. The "subagents can't spawn subagents" constraint never bites because the only fan-out point is the parent.
 
 ### Setup (once per run)
 
@@ -318,7 +318,7 @@ When a merge is authorized:
    5. **Re-run quality gates in the rebased workspace** by dispatching a fresh `coder-*` `Task` scoped to it (gates only — no implementation). A passing rebased branch then merges into `<default-branch>` with `git -C <repo-root> merge --no-ff ticket/<id-lower>`. A failing rebased branch routes back to the ticket's coder for one capped fix-up round before re-attempting merge.
    6. After a successful merge, hand off to `@odin` Phase 5 to update the ticket: `status='complete'`, `completed_at=now()`, clear `assigned_to`, `branch_name`, `blocked_reason`, in-progress labels. Then remove the workspace — `git worktree remove .worktrees/<id-lower>` (worktree runs) and `git branch -d ticket/<id-lower>`.
    7. **Push** `<default-branch>` only when `--push` is present, or with explicit user confirmation (matches Odin's rule, except in pre-authorized headless). Never push on a bare `--auto-merge`.
-3. **Locked-tests integrity across merges.** When a later ticket's rebase touches a file an earlier-merged ticket locked in `metadata.locked_tests`, recompute SHA-256 hashes after rebase and **before** running gates. Drift means a later ticket weakened an earlier ticket's contract — escalate to the user, do not auto-merge.
+3. **Test integrity across merges.** When a later ticket's rebase touches test files an earlier-merged ticket added, the rebased-workspace gate pass (step 5) must confirm those tests still run and still assert what they did — a rebase that weakens, skips, or drops an earlier ticket's test is a CRITICAL finding. Escalate to the user, do not auto-merge.
 
 ### End-of-run cleanup
 
@@ -403,7 +403,7 @@ RETURNING id, title, jsonb_array_length(images) AS image_count;
 The `AND status = 'backlog'` guard prevents double-assignment. As with the auto-claim path, materialize images into the worktree when `image_count > 0` before handing to Odin.
 
 ### Append progress / notes
-Append a comment object to `metadata.comments` (do **not** mutate the description). One element per note. Schema for each element: `{ author, when, body }` — `author` is the agent/role posting (e.g. `odin`, `coder-web`, `tdd`, `data-architect`, `dispatcher`).
+Append a comment object to `metadata.comments` (do **not** mutate the description). One element per note. Schema for each element: `{ author, when, body }` — `author` is the agent/role posting (e.g. `odin`, `coder-web`, `code-review`, `data-architect`, `dispatcher`).
 
 ```sql
 UPDATE public.tickets
@@ -422,7 +422,7 @@ SET metadata = jsonb_set(
 WHERE id = '<id>';
 ```
 
-Use this only when context genuinely needs to be shared between agents or with a future session. Most run state already lives in `metadata.acceptance_criteria`, `metadata.locked_tests`, `metadata.qa`, `metadata.outcome`, and `metadata.telemetry`.
+Use this only when context genuinely needs to be shared between agents or with a future session. Most run state already lives in `metadata.acceptance_criteria`, `metadata.qa`, `metadata.outcome`, and `metadata.telemetry`.
 
 ### Update files_affected mid-flight
 
@@ -520,7 +520,6 @@ SELECT metadata->'outcome'              AS outcome,
        metadata->'telemetry'            AS telemetry,
        metadata->'qa'                   AS qa,
        metadata->'acceptance_criteria'  AS acceptance_criteria,
-       metadata->'locked_tests'         AS locked_tests,
        metadata->'comments'             AS comments
 FROM public.tickets WHERE id = '<id>';
 ```

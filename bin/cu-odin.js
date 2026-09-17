@@ -157,7 +157,7 @@ function detectStack(dir) {
 
 // Filter agent files by chosen stack ("nextjs" or "flutter"). Only the coder for the
 // chosen stack is installed. coder-elite is shared across stacks and always installs,
-// alongside the other stack-agnostic agents (tdd, ux-design, data-architect,
+// alongside the other stack-agnostic agents (ux-design, data-architect,
 // security-review, code-review, odin).
 function agentForStack(rel, stack) {
   const filename = path.basename(rel);

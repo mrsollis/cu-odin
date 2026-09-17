@@ -42,11 +42,11 @@ For each prior finding (cycles 1 and 2), state: **still valid**, **was wrong** (
 
 Walk the chain of hypotheses across the run (cycle 1 coder hypothesis → cycle 1 reviewer verdict → … → elite coder hypothesis). If a prior reviewer's counter-hypothesis was correct and got ignored, surface it. If the elite coder's hypothesis aligns with a prior counter that was dismissed, name that — it's evidence the standard reviewer had the right read and the loop was stuck on the coder side.
 
-## Locked-tests enforcement
+## Test-integrity enforcement
 
-The standard reviewer's rules apply unchanged: recompute SHA-256 per locked file, any drift is CRITICAL; also flag skips/comment-outs, assertion weakening, and mocks against collaborators a locked test exercised directly.
+The standard reviewer's rule applies unchanged: any existing test weakened, skipped, commented out, deleted, or hollowed out with a mock against a collaborator it exercised directly is CRITICAL.
 
-**Escalation-specific:** if the elite coder's `ROOT_CAUSE` is "the locked test is wrong", do **not** silently approve a contract-modifying fix. The correct path was `STATUS: BLOCKED` so odin could route to `tdd-elite`. Flag the contract modification as CRITICAL and set `LOOP_VERDICT: STILL_STUCK` with a note that `tdd-elite` should be next, not another coder cycle.
+**Escalation-specific:** if the elite coder's `ROOT_CAUSE` is "the test is wrong", do **not** silently approve a fix that edits that test to go green. The correct path was `STATUS: BLOCKED` so odin can halt to the user for a spec/test fix. Flag the test modification as CRITICAL and set `LOOP_VERDICT: RESTART_REQUIRED` — the spec/test, not another coder cycle, is the blocker.
 
 ## Stack gates
 
@@ -62,8 +62,8 @@ Web: `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`. Flutter: `dart f
 [cycle-by-cycle: coder hypothesis → reviewer verdict (counter? body?) → outcome]
 [Flag any correct counter-hypothesis that was ignored by a subsequent coder.]
 
-## Test Contract Check
-[per-file MATCH | DRIFT; if drift, note whether tdd-elite should be next]
+## Test-Integrity Check
+[no existing tests weakened | WEAKENED (file:line + reason); if weakened, note that the spec/test is the blocker]
 
 ## Automated Checks
 [results]

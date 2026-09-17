@@ -87,8 +87,7 @@ Each entry is one of two shapes:
 
 | Key | Writer phase | jsonb shape | Reserved — do not use for project data |
 |---|---|---|---|
-| `acceptance_criteria` | Phase 1 — odin authors after plan synthesis | array of `{ id, text }` — flat list of testable acceptance criteria. `tdd` anchors locked tests to these (each test tags its `AC-N`); `code-review` checks the implementation against the list at Phase 2. | ✗ reserved |
-| `locked_tests` | Phase 1.5 — TDD locks the test contract | `{ files: [{path, sha256}], coverage: [{ac, file}], locked_at }` | ✗ reserved |
+| `acceptance_criteria` | Phase 1 — odin authors after plan synthesis | array of `{ id, text }` — flat list of testable acceptance criteria. The coder implements and writes tests against these; `code-review` checks the implementation against the list at Phase 2. | ✗ reserved |
 | `qa` | Phase 4 — QA handoff | `{ checklist: "<markdown>", posted_at }` | ✗ reserved |
 | `outcome` | Phase 5 — ship; authored by odin from run transcripts | markdown string ("what changed" summary) | ✗ reserved |
 | `telemetry` | Phase 5 — ship; `/process-ticket` on harness halt | run-telemetry block (mode, completed_at, duration, diff stats, per-track attempt counts, gate outcomes, blocked events). Also carries `telemetry.harness_halts: [{ when, cause, detail, worktree }]` — appended by the dispatcher when a ticket is unclaimed after the parent session crashed mid-cohort. Distinct from `blocked_reason`, which records work-blocks on still-active tickets. | ✗ reserved |
