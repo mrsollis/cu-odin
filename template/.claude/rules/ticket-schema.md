@@ -26,7 +26,6 @@ Each entry is `{ id, source, mime, caption, added_at }` plus either `data` (base
 |-----|------------|-------|
 | `acceptance_criteria` | odin (Phase 1) | `[{id: "AC-1", text: "..."}, ...]` |
 | `gate_set` | odin (Phase 1) | activated gates + reasons (see odin.md) |
-| `locked_tests` | tdd (Phase 1.5) | `{locked_at, files: [{path, sha256}], coverage: [...], red_run}` |
 | `qa` | odin (Phase 4) | `{checklist, posted_at}` |
 | `outcome` | odin (Phase 5) | markdown body |
 | `telemetry` | odin (Phase 5) | structured run data |
@@ -81,7 +80,6 @@ WHERE id = '<this-ticket-id>';
       "by_agent": {
         "coder-web":       { "total": 204100, "calls": 3 },
         "code-review":     { "total": 151019, "calls": 3 },
-        "tdd":             { "total":  75964, "calls": 1 },
         "security-review": { "total":  90160, "calls": 1 }
       }
     },
@@ -94,10 +92,9 @@ WHERE id = '<this-ticket-id>';
       { "name": "Track 1", "standard_attempts": 1, "opus_elite_attempts": 0, "fable_elite_attempts": 0 }
     ],
     "gates": {
-      "activated": ["data-architect", "tdd", "security-review"],
-      "skipped": ["ux-design", "evaluator"],
+      "activated": ["data-architect", "security-review"],
+      "skipped": ["ux-design", "multi-planner", "evaluator"],
       "elite_gate": "not_triggered",
-      "tdd_elite_invoked": false,
       "data_gate": "approved",
       "security_gate": "secure"
     },

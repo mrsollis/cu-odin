@@ -32,7 +32,7 @@ create table tickets (
   blocked_reason  text,                                   -- first-class; status stays 'active'
   pr_url          text,
   images          jsonb not null default '[]',            -- up to 5 attachments; fed to odin/specialists as visual context. See constraint + shape below.
-  metadata        jsonb not null default '{}',            -- orchestrator-reserved keys (outcome, telemetry, qa, locked_tests, cancellation, comments) + project extension slot
+  metadata        jsonb not null default '{}',            -- orchestrator-reserved keys (outcome, telemetry, qa, cancellation, comments) + project extension slot
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   completed_at    timestamptz,

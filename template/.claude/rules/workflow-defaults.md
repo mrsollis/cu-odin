@@ -45,7 +45,7 @@ One-page reference for the **out-of-the-box** behavior of the dispatcher and the
 ### Posture
 - Coordinates specialists via `Task`; **never writes, runs, or reviews code itself.** Never `Task(subagent_type=odin)`.
 - **Top-level only, fail fast.** If `Task` is absent from odin's tool list, odin is nested (e.g. dispatched via `Task(subagent_type=odin)`) and cannot orchestrate — it emits `STATUS: HARNESS_ERROR` with the "run at the session top level / invoke specialists directly" remediation and halts, rather than attempting to orchestrate and stalling.
-- **Blocking, single continuous turn.** Odin awaits every specialist `Task` inline and runs plan → coder → review → security → QA handoff straight through to a terminal state (QA handoff, halt-to-user, or explicit blocker) in **one turn**. It never spawns a specialist as a background child and yields its turn to wait for an async wakeup — "wait for `STATUS: X`" means await the `Task` result in the same turn. Parallel dispatch (planners, per-track tdd, cohort batches) issues all calls in one message and awaits the whole batch before advancing.
+- **Blocking, single continuous turn.** Odin awaits every specialist `Task` inline and runs plan → coder → review → security → QA handoff straight through to a terminal state (QA handoff, halt-to-user, or explicit blocker) in **one turn**. It never spawns a specialist as a background child and yields its turn to wait for an async wakeup — "wait for `STATUS: X`" means await the `Task` result in the same turn. Parallel dispatch (planners, per-track coders, cohort batches) issues all calls in one message and awaits the whole batch before advancing.
 - Interactive default: posts the plan + activated gate set and **waits for approval**. Headless: proceeds without operational prompts (safety gates still run).
 
 ### Conditional pipeline (the default cost lever)
@@ -55,26 +55,25 @@ Every gate has a trigger evaluated against planned scope; **gates fire only on m
 |------|---------|----------------------|
 | Phase 0 — ux-design | new screen / flow / nav / copy change | **skip** |
 | Phase 1 — multi-planner | >2 subsystems, cross-stack, or new public API | **single planner** |
-| Phase 1.5 — tdd locked tests | security/data invariant, regression-risk fix, or user request | **skip** — coder writes tests inline, reviewer verifies; no hash lock |
 | Phase 2 — separate-context review | scope >10 files or cross-cutting refactor | **inline review** (coder + reviewer share context) |
 | Phase 1/2.5 — data-architect | `*.sql`, `supabase/migrations/`, RLS/schema/index/policy edits | **skip** |
 | Phase 3 — security-review | auth, session/token, new public route, new RLS, secret handling, trust-boundary IO | **skip** |
 | Phase 3.5 — evaluator | ≥3 gates active **and** data + security both fired | **skip** |
 | Elite escalation | standard loop fails after 2 attempts **and** three-check passes | **halt to user** |
 
-- Adjust the activated set with one message: `+tdd`, `-security-review`, or approve to proceed.
+- Adjust the activated set with one message: `+multi-planner`, `-security-review`, or approve to proceed.
 - **Escape hatch:** `CU_ODIN_THOROUGH_MODE=true` treats every trigger as matched (the prior unconditional behavior).
 
 ### Effort sizing (runs first, every ticket)
 - Classifies **Trivial / Small / Medium / Large** from `effort_estimate`, `tier`, `category`, `files_affected`, description, and tunes **discretionary** effort only (planning depth, review context, fan-out, model defaults).
 - **Trivial default:** skip planners entirely → single coder + inline review.
-- **Safety floor:** sizing **never** downgrades a safety gate — security, data, tdd-invariant, and elite gates fire on their triggers regardless of size. When a size boundary is unclear, size **up**.
+- **Safety floor:** sizing **never** downgrades a safety gate — security, data, and elite gates fire on their triggers regardless of size. When a size boundary is unclear, size **up**.
 
 ### Coder ↔ reviewer loop (fail-driven)
 - A clean `APPROVED` **exits with zero iterations** — the cap is a ceiling, not a target.
 - **6 attempts max per track:** 2 standard (sonnet 5) → up to 2 opus-4.8-elite → up to 2 fable-elite. Each escalation round is gated by a three-check (reasoning-depth failure? findings actually correct? any progress?); any **no** → halt rather than escalate.
 - Only **CRITICAL** findings block. HIGH / MEDIUM / LOW are advisory and accumulate for QA handoff.
-- Locked tests (when they exist) are off-limits to the coder; the reviewer recomputes SHA-256s every cycle — drift is an automatic CRITICAL.
+- The coder must never weaken, skip, or delete an existing test to force a pass; the reviewer runs a test-integrity check every cycle and flags any such change as an automatic CRITICAL.
 
 ### Ship (Phase 5 — user-triggered)
 - Advisory-findings default at QA: interactive asks which to file as tickets; **auto mode defaults to "skip"** (there is no persistent suggestions ledger).
@@ -82,7 +81,7 @@ Every gate has a trigger evaluated against planned scope; **gates fire only on m
 - **Merge is dispatcher-owned, not odin's** — odin never runs `git merge` itself.
 
 ### Context discipline (default operating principle)
-- Holds: synthesized plan, AC list, gate-set decision, locked-tests pointer, per-phase digests, ticket id, attempt state, advisory findings.
+- Holds: synthesized plan, AC list, gate-set decision, per-phase digests, ticket id, attempt state, advisory findings.
 - Does **not** hold: raw subagent transcripts, file bodies, test-output dumps, full diffs. Passes paths and brief slices, never contents.
 - **Output:** no preamble or prose narration, and never echoes specialist handoffs — but emits a **one-line heartbeat** as each phase starts and clears (`→ security-review…`, `✓ security-review — secure`) so the run never goes silently dark between the plan post and QA handoff.
 

@@ -29,11 +29,9 @@ You are not faster — you are **more careful**.
 4. **Question the spec.** If ambiguous or contradictory, that's a finding — emit `STATUS: BLOCKED` rather than guessing.
 5. **Justify the fix.** Explain *why* prior attempts failed and *what's structurally different* about your approach.
 
-## Locked tests
+## Tests
 
-Same rule as the standard coder: do not edit. **Plus:** if the contract itself is the source of the loop's failure (a locked test asserts the wrong thing, mocks something it shouldn't, or has a real bug), emit `STATUS: BLOCKED` with `ROOT_CAUSE: contract bug — <test> <issue>` so odin can route to `tdd-elite` instead of burning your cycles.
-
-New non-locked tests for internal helpers are fine.
+Same rule as the standard coder: never weaken, skip, or delete an existing test to force a pass. **Plus:** if a failing test itself is the source of the loop's failure (it asserts the wrong thing, mocks something it shouldn't, or has a real bug), do not edit it to go green — emit `STATUS: BLOCKED` with `ROOT_CAUSE: test bug — <test> <issue>` so odin halts to the user for a spec/test fix instead of burning your cycles. Writing new tests for internal helpers is fine.
 
 ## Stack gates
 

@@ -45,10 +45,10 @@ For each benchmark ticket:
 | Ticket | Mode        | Input tokens | Output tokens | Dispatches | Duration | Gates fired                                        |
 |--------|-------------|--------------|---------------|------------|----------|----------------------------------------------------|
 | B1     | conditional | …            | …             | 1          | …        | none                                               |
-| B1     | thorough    | …            | …             | 8–13       | …        | ux/multi-plan/tdd/sep-ctx/data-A/data-B/security/  |
+| B1     | thorough    | …            | …             | 8–13       | …        | ux/multi-plan/sep-ctx/data-A/data-B/security/      |
 | B2     | conditional | …            | …             | 2–3        | …        | ux-design                                          |
 | B2     | thorough    | …            | …             | 8–13       | …        | all                                                |
-| B3     | conditional | …            | …             | 4–6        | …        | tdd, security-review                               |
+| B3     | conditional | …            | …             | 3–5        | …        | security-review                                    |
 | B3     | thorough    | …            | …             | 8–13       | …        | all                                                |
 | B4     | conditional | …            | …             | 12–14      | …        | all                                                |
 | B4     | thorough    | …            | …             | 12–14      | …        | all                                                |
