@@ -204,7 +204,7 @@ async function promptDecisions(groups) {
     exists: claudeMdExists,
     questionExists: "Overwrite the existing CLAUDE.md with the latest from this cu-odin release?",
     questionMissing: "Install CLAUDE.md?",
-    defaultIfExists: false,
+    defaultIfExists: true,
     defaultIfMissing: true,
   });
 
@@ -214,7 +214,7 @@ async function promptDecisions(groups) {
     exists: agentsExists,
     questionExists: "Overwrite the existing agents with the latest from this cu-odin release?",
     questionMissing: "Install agents?",
-    defaultIfExists: false,
+    defaultIfExists: true,
     defaultIfMissing: true,
   });
 
@@ -244,7 +244,7 @@ async function promptDecisions(groups) {
     exists: rulesHarnessExists,
     questionExists: "Overwrite the vendored rules files (ticket-schema.md, harness-reuse.md) with the latest from this cu-odin release?",
     questionMissing: "Install vendored rules files (ticket-schema.md, harness-reuse.md)?",
-    defaultIfExists: false,
+    defaultIfExists: true,
     defaultIfMissing: true,
   });
 
@@ -254,7 +254,7 @@ async function promptDecisions(groups) {
     exists: benchmarksExists,
     questionExists: "Overwrite the benchmarks recipe with the latest from this cu-odin release?",
     questionMissing: "Install benchmarks recipe?",
-    defaultIfExists: false,
+    defaultIfExists: true,
     defaultIfMissing: true,
   });
 
@@ -264,7 +264,7 @@ async function promptDecisions(groups) {
     exists: ticketsExists,
     questionExists: "Overwrite the existing ticket-system assets (including schema.sql) with the latest from this cu-odin release?",
     questionMissing: "Install ticket-system assets?",
-    defaultIfExists: false,
+    defaultIfExists: true,
     defaultIfMissing: true,
   });
 
@@ -274,7 +274,7 @@ async function promptDecisions(groups) {
     exists: skillsExists,
     questionExists: "Overwrite the existing skills with the latest from this cu-odin release?",
     questionMissing: "Install skills?",
-    defaultIfExists: false,
+    defaultIfExists: true,
     defaultIfMissing: true,
   });
 
@@ -298,7 +298,10 @@ async function ask({
   }
 
   if (!process.stdin.isTTY) {
-    // No TTY (piped/CI). Use safest behavior: install if missing, skip if exists.
+    // No TTY (piped/CI). Follow the same default as an interactive Enter:
+    // overwrite/install when the default is yes, skip when it's no. This keeps
+    // domain.md and design-system/ safe (default no on re-install) while letting
+    // the versioned harness files refresh.
     return def ? (exists ? "overwrite" : "missing-only") : "skip";
   }
 
@@ -395,12 +398,13 @@ Usage:
   npx -y github:mrsollis/cu-odin init        Same as default
   npx -y github:mrsollis/cu-odin init --yes  Accept all defaults non-interactively
 
-Interactive prompts:
-  - Overwrite agents + CLAUDE.md?           (default: no if they exist, yes if not)
-  - Stub in .claude/rules/domain.md?        (default: no if it exists, yes if not)
-  - Stub in .claude/rules/design-system/?   (default: no if it exists, yes if not)
-  - Overwrite .claude/skills/?              (default: no if they exist, yes if not)
-  - Overwrite .claude/assets/ticket-system/?(default: no if they exist, yes if not)
+Interactive prompts (Enter accepts the default):
+  - Overwrite agents + CLAUDE.md?            (default: yes)
+  - Overwrite vendored rules / benchmarks?   (default: yes)
+  - Overwrite .claude/skills/?               (default: yes)
+  - Overwrite .claude/assets/ticket-system/? (default: yes)
+  - Stub in .claude/rules/domain.md?         (default: no if it exists, yes if not)
+  - Stub in .claude/rules/design-system/?    (default: no if it exists, yes if not)
 
 Options:
   -y, --yes        Accept defaults non-interactively (safest in CI)
