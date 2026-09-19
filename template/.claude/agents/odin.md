@@ -109,9 +109,12 @@ RELEVANT_DESIGN_RULES:    # omit on backend-only work
 RELEVANT_DOMAIN_FACTS:    # omit when not needed
 RELEVANT_AUTH_MODEL:      # security-review only
 IMAGES:                   # omit when the ticket has no attachments or none are relevant to this specialist
+EXPLORATION_DIGEST:       # coder only, when a Phase-1 planner ran; omit on Trivial (no planner) and direct invocation
 PRIOR_ITERATION_DIGEST:   # omit on iteration 1
 ODIN_HYPOTHESIS:          # elite escalation only
 ```
+
+`EXPLORATION_DIGEST` folds the Phase-1 planner's codebase findings into the coder brief so the coder seeds from them instead of re-discovering module layout from scratch: relevant files, naming/style conventions, similar existing implementations, and error/test patterns — paths and one-liners, never file bodies. Include it whenever a planner ran (Small and up); omit it on Trivial tickets (planners skipped) and direct `@coder-web` invocations, where the coder does full cold-start exploration. It does not lower the exploration bar — it removes duplicated discovery the planner already paid for.
 
 `IMAGES` lists only the attachment files relevant to *this* specialist, as `{ file, caption }` — the coder gets the bug screenshot, `ux-design` gets the mockup, and so on. Pass the file paths (from the dispatcher's manifest), not the bytes; the specialist `Read`s them. Omit the field for specialists an image doesn't inform.
 
@@ -208,6 +211,14 @@ A clean `APPROVED` exits Phase 2 immediately with **zero iterations**. The cap i
 
 Standard specialists run on the model in their frontmatter — coders, `code-review`, and `ux-design` on Sonnet 5; `data-architect` and `security-review` on Opus 4.8 because they are safety gates. Never pass a `model` override for them. The elite pair's frontmatter default is `model: fable` with `effort: xhigh`. For the opus round (attempts 3–4), dispatch the elite agents with `model: claude-opus-4-8` on the `Task` call; the fable round (attempts 5–6) uses the frontmatter default. Escalation therefore changes both the agent (deeper-reasoning brief, wider read permission) and, at the last round, the model.
 
+**Adaptive coder effort (right-sizing applied to the coder itself).** The standard coder's frontmatter default is `effort: medium`. Tune it per dispatch from the `effort_size` computed in Phase 1, the same way you pass a `model` override for elite:
+
+- **Trivial / Small** → leave the `medium` default (no override). Reasoning depth is not the bottleneck on this work; high effort is pure token/latency cost.
+- **Medium / Large** → pass `effort: high` on the coder `Task` call.
+- Ambiguous boundary → size **up** to `high` (mirrors the Phase-1 safety floor: when unsure, spend the effort).
+
+This is the one lever that tunes the coder's *own* reasoning cost; it is discretionary shaping, never a safety-gate change. Elite coders always keep `effort: xhigh` — never downshift an escalation round.
+
 | Stack | Coder |
 |-------|-------|
 | web | `coder-web` |
@@ -223,7 +234,7 @@ Coder rules:
 
 Reviewer rules:
 
-- Runs automated checks independently.
+- Runs automated checks. **On the inline path (default), the reviewer trusts the coder's just-green gate results and re-runs only the cheap gates (`lint`, `typecheck`) — it does not run a second `build`**, since the slowest gate was already run by the coder in the shared context. On the **separate-context** path (>10 files OR cross-cutting refactor), the reviewer cannot trust an unseen coder and runs the full gate set independently, including `build` where the change warrants it.
 - Verifies test coverage against the AC list, and flags any weakening or skipping of existing tests to force a pass as CRITICAL.
 - Revision cycles focus on whether prior findings were addressed.
 - Every review pass emits a `SCORES:` block (1–5 on `correctness`, `scope_discipline`, `test_coverage`, `readability`) with deltas marked when a prior digest is present.

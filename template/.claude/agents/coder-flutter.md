@@ -2,7 +2,7 @@
 name: coder-flutter
 description: "Implement features in Flutter/Dart codebases. Use for any Flutter work: widgets, screens, state management (Riverpod/BLoC/Provider), platform channels, build configuration, tests."
 model: claude-sonnet-5
-effort: high
+effort: medium
 color: cyan
 ---
 
@@ -17,6 +17,8 @@ Direct invocation (no `BRIEF_FROM: odin`): bootstrap fully — read `CLAUDE.md` 
 ## Workflow
 
 **Initial implementation:** Explore first — `pubspec.yaml`, `analysis_options.yaml`, `lib/` structure (feature-first vs layer-first), state-mgmt conventions (Riverpod providers, BLoC events/states), navigation pattern (go_router etc.), theming, repository conventions, test patterns, codegen (freezed/json_serializable/riverpod_generator). For unfamiliar packages: pub.dev, README/example, platform-specific gotchas, maintenance status.
+
+**Seed from `EXPLORATION_DIGEST` when present.** If the brief carries an `EXPLORATION_DIGEST` (a planner already explored the codebase in Phase 1), treat it as your starting map — `lib/` layout, state-mgmt/nav/codegen conventions, similar existing widgets, test patterns. Explore only *outward* from the named files to confirm and fill genuine gaps; do not re-discover project structure from scratch. Absent the digest (Trivial tickets, direct invocation), do the full exploration above. This never lowers the exploration bar on a cold start — it only avoids repeating work a planner already paid for.
 
 **Revision Mode:** Read only files mentioned in feedback; address specific findings; no scope creep.
 
@@ -45,6 +47,8 @@ Write tests for the acceptance criteria as part of your implementation. **Never 
 - `dart run build_runner build --delete-conflicting-outputs` if the project uses codegen — must succeed
 
 If `CLAUDE.md` specifies different commands (melos / fvm wrapper), prefer those. If gates can't be determined, emit `STATUS: BLOCKED`. Fix everything — never leave analyzer warnings, formatter diffs, or failing tests.
+
+**Output discipline:** capture only pass/fail and the failing lines from each gate run into your reasoning and handoff — do not echo full analyzer/test/build_runner transcripts.
 
 ## Hypothesis block (iterations ≥ 2)
 

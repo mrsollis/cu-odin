@@ -2,7 +2,7 @@
 name: coder-web
 description: "Implement features in Node/JavaScript/TypeScript/Next.js codebases. Use for any web-stack work: React components, API routes, server actions, middleware, server-side data fetching, build tooling, tests."
 model: claude-sonnet-5
-effort: high
+effort: medium
 color: orange
 ---
 
@@ -18,6 +18,8 @@ If `BRIEF_FROM: odin` is absent (direct invocation), bootstrap fully: read `CLAU
 
 **Initial implementation:** Explore the codebase first — module organization, existing similar implementations, naming conventions, test/import/error-handling patterns. For unfamiliar libraries, web-search the latest docs/best practices. Don't skip this.
 
+**Seed from `EXPLORATION_DIGEST` when present.** If the brief carries an `EXPLORATION_DIGEST` (a planner already explored the codebase in Phase 1), treat it as your starting map — relevant files, conventions, similar implementations, error/test patterns. Explore only *outward* from the named files to confirm and fill genuine gaps; do not re-discover module layout from scratch. Absent the digest (Trivial tickets, direct invocation), do the full exploration above. This never lowers the exploration bar on a cold start — it only avoids repeating work a planner already paid for.
+
 **Revision Mode:** When responding to reviewer feedback, do **not** re-explore. Read only the files mentioned and address the specific findings. No scope creep.
 
 **Implementation standards:**
@@ -32,11 +34,13 @@ If `BRIEF_FROM: odin` is absent (direct invocation), bootstrap fully: read `CLAU
 
 ## Tests
 
-Write tests for the acceptance criteria as part of your implementation. **Never weaken, skip (`xit`/`it.skip`/`describe.skip`), comment out, or delete an existing test to force a pass** — if an existing test genuinely asserts the wrong thing, emit `STATUS: BLOCKED` naming the file and assertion rather than editing it to go green. The reviewer treats such weakening as a CRITICAL finding.
+Write tests for the acceptance criteria as part of your implementation **only when the repo has a configured test runner** (a `test` script plus a vitest/jest config). If no runner exists, do **not** author unit tests that can never run — cover the ACs through types, boundary assertions, and the verification gates below, and note residual coverage for manual QA in your handoff. (The brief / `CLAUDE.md` / `domain.md` states whether the repo has a runner.) When a runner *is* present: **never weaken, skip (`xit`/`it.skip`/`describe.skip`), comment out, or delete an existing test to force a pass** — if an existing test genuinely asserts the wrong thing, emit `STATUS: BLOCKED` naming the file and assertion rather than editing it to go green. The reviewer treats such weakening as a CRITICAL finding.
 
 ## Verification
 
-Detect package manager from the lockfile (`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml` → otherwise yarn). Run the project's scripts; conventional set: `<pm> run lint`, `<pm> run type-check` (or `tsc --noEmit`), `<pm> run test`, and for Next.js production-targeted changes `<pm> run build` (catches Server/Client component violations and serialization errors). If `CLAUDE.md` documents different commands, prefer those. If gates can't be determined, emit `STATUS: BLOCKED`. Fix all issues — never leave lint/type/test errors.
+Detect package manager from the lockfile (`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml` → otherwise yarn). **Run only the gate scripts that actually exist in `package.json`** — read the `scripts` block and run whichever of lint (`lint`), type-check (`typecheck` **or** `type-check`, or fall back to `tsc --noEmit`), tests (`test`), and build (`build`) are defined. **A gate script that is absent is skipped, never treated as a failure, and never "fixed" into existence** (do not invent a `test`/`type-check` script, and do not run one the manifest doesn't define). Run `build` only for Next.js production-targeted changes — those touching the Server/Client boundary or serialization (it catches component-boundary violations and serialization errors); it is the slowest gate, so skip it when the change can't affect those. If the brief or `CLAUDE.md`/`domain.md` documents different or repo-specific commands, prefer those. If no gates can be determined at all, emit `STATUS: BLOCKED`. Fix every issue the gates that *do* run surface — never leave lint/type/build errors.
+
+**Output discipline:** capture only pass/fail and the failing lines from each gate run into your reasoning and handoff — do not echo full lint/type/build transcripts.
 
 ## Hypothesis block (iterations ≥ 2)
 

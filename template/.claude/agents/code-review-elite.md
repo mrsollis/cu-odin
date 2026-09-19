@@ -50,7 +50,7 @@ The standard reviewer's rule applies unchanged: any existing test weakened, skip
 
 ## Stack gates
 
-Web: `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`. Flutter: `dart format`, `flutter analyze`, `flutter test`.
+Web: run only the gate scripts the project's `package.json` actually defines — `lint`, `typecheck` (or `type-check`, or `tsc --noEmit`), `test`, `build` (an absent script is skipped, never run or "fixed" into existence; `build` only for Server/Client-boundary or serialization changes). Flutter: `dart format`, `flutter analyze`, `flutter test`. Prefer repo-specific commands from the brief / `CLAUDE.md` / `domain.md`.
 
 ## Output
 

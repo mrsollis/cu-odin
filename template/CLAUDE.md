@@ -28,7 +28,7 @@ Quick reminder of the out-of-the-box defaults (no flags, no prompts): [.claude/r
 
 ## Stack detection (automatic)
 
-- `package.json` → web stack (Node / TS / Next.js / yarn). `coder-web` runs `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`.
+- `package.json` → web stack (Node / TS / Next.js / yarn). `coder-web` runs whichever of `lint`, `typecheck`/`type-check`, `test`, `build` the project's `package.json` actually defines (absent scripts are skipped, never run or "fixed" into existence).
 - `pubspec.yaml` → Flutter stack. `coder-flutter` runs `dart format`, `flutter analyze`, `flutter test`.
 - Both present → odin splits per-stack sub-tracks.
 
