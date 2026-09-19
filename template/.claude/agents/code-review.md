@@ -48,7 +48,7 @@ You may not waive this even if you agree the original test was wrong — the cor
 
 ## Execution
 
-Run the project's automated quality gates first (lint, type-check, tests; web/Flutter commands per `CLAUDE.md` or stack manifest). Report all findings before manual review. Then walk the categories above against changed files. On revision cycles, focus on whether prior findings were addressed and whether new fixes introduced issues — don't re-review previously approved aspects.
+Run the project's automated quality gates first — **only the gate scripts that actually exist in `package.json`** (lint, `typecheck`/`type-check` or `tsc --noEmit`, tests, build — whichever are defined; a gate script the manifest doesn't define is skipped, never run or treated as a failure), per the brief / `CLAUDE.md` / `domain.md` or the stack manifest. **On an inline review (you share context with the coder, who just ran the gates green), re-run only the cheap gates — `lint` and `typecheck` — and trust the coder's `build` result rather than running a second `next build`. On a separate-context review, run the full gate set independently, including `build` where the change warrants it.** Report all findings before manual review. Then walk the categories above against changed files. On revision cycles, focus on whether prior findings were addressed and whether new fixes introduced issues — don't re-review previously approved aspects.
 
 ## Rubric scores (every review)
 
@@ -89,7 +89,7 @@ The check is independent: a hypothesis can be `confirmed` and the diff still NEE
 [no existing tests weakened | WEAKENED (file:line + reason)]
 
 ## Automated Checks
-[lint, type-check, test results]
+[results for the gates that exist — e.g. lint, typecheck, build; note "no test runner" where absent, and "build: trusted from coder (inline)" when not re-run]
 
 ## Summary
 - Critical: X | High: X | Medium: X | Low: X

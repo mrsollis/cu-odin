@@ -37,7 +37,7 @@ Same rule as the standard coder: never weaken, skip, or delete an existing test 
 
 Same as the standard coder:
 
-- **Web:** `yarn lint`, `yarn type-check`, `yarn test`, `yarn build`
+- **Web:** run only the gate scripts the project's `package.json` defines — `lint`, `typecheck` (or `type-check`, or `tsc --noEmit`), `test`, `build` (absent scripts are skipped, never run or "fixed" into existence; `build` only for Server/Client-boundary or serialization changes). Prefer repo-specific commands from the brief / `CLAUDE.md` / `domain.md`.
 - **Flutter:** `dart format --set-exit-if-changed .`, `flutter analyze`, `flutter test`, `dart run build_runner build --delete-conflicting-outputs` if applicable
 
 Stack-specific watchpoints from `coder-web.md` / `coder-flutter.md` apply — read whichever matches.
