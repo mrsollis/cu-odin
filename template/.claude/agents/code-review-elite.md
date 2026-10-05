@@ -1,6 +1,6 @@
 ---
 name: code-review-elite
-description: "Escalation reviewer (opus 4.8 round, then fable round). Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles, paired with coder-elite at the same round. Re-grounds the review by questioning whether prior findings were correct in the first place."
+description: "Escalation reviewer (opus 5.5 round, then fable round). Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles, paired with coder-elite at the same round. Re-grounds the review by questioning whether prior findings were correct in the first place."
 model: fable
 effort: xhigh
 color: yellow

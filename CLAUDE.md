@@ -16,15 +16,15 @@ That's it. The installer asks three quick questions (stub in domain? stub in des
 CLAUDE.md
 .claude/
 ├── agents/
-│   ├── odin.md                  # orchestrator (opus 4.8) — auto-loaded by CLAUDE.md
-│   ├── coder-web.md             # Node/TS/Next.js implementer (sonnet 5)
-│   ├── coder-flutter.md         # Dart/Flutter implementer (sonnet 5)
-│   ├── coder-elite.md           # escalation coder (gated; opus 4.8 → fable)
-│   ├── code-review.md           # standard reviewer (sonnet 5)
-│   ├── code-review-elite.md     # escalation reviewer (gated; opus 4.8 → fable)
-│   ├── data-architect.md        # Supabase schema / RLS / data security (opus 4.8)
-│   ├── security-review.md       # OWASP-focused review (opus 4.8)
-│   └── ux-design.md             # design spec producer (sonnet 5)
+│   ├── odin.md                  # orchestrator (opus 5.5) — auto-loaded by CLAUDE.md
+│   ├── coder-web.md             # Node/TS/Next.js implementer (sonnet)
+│   ├── coder-flutter.md         # Dart/Flutter implementer (sonnet)
+│   ├── coder-elite.md           # escalation coder (gated; opus 5.5 → fable)
+│   ├── code-review.md           # standard reviewer (sonnet)
+│   ├── code-review-elite.md     # escalation reviewer (gated; opus 5.5 → fable)
+│   ├── data-architect.md        # Supabase schema / RLS / data security (opus 5.5)
+│   ├── security-review.md       # OWASP-focused review (opus 5.5)
+│   └── ux-design.md             # design spec producer (sonnet)
 ├── rules/
 │   ├── domain.md                # PLACEHOLDER — fill in your project brief
 │   └── design-system/           # PLACEHOLDER — drop your design system here
@@ -43,7 +43,7 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 0. **Effort sizing** (up front). Odin gauges the level of work from the ticket itself (`effort_estimate`, `tier`, `category`, `files_affected`, description) and tunes discretionary effort — planning depth, review context, fan-out — so trivial tickets stay cheap in time, compute, and tokens. **Safety gates are never tuned down:** security, data, and elite-escalation gates fire on their scope triggers regardless of size — quality, security, and performance are never traded for tokens.
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Odin authors a flat list of acceptance criteria into `metadata.acceptance_criteria`; this is what the coder implements against and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
-3. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. The coder writes tests for the acceptance criteria as part of the implementation; the reviewer verifies coverage against the AC list and runs a **test-integrity check** — any existing test weakened, skipped, or deleted to force a pass is an automatic CRITICAL. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **6 total attempts per track** (2 standard on Sonnet 5, then up to 2 Opus 4.8 elite, then up to 2 Fable elite — each escalation round gated separately, each gated by a three-check that confirms another round would actually help). If the reviewer determines the spec or a test asserts the wrong thing, the loop halts to the user for a spec fix rather than letting the coder edit the test green.
+3. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. The coder writes tests for the acceptance criteria as part of the implementation; the reviewer verifies coverage against the AC list and runs a **test-integrity check** — any existing test weakened, skipped, or deleted to force a pass is an automatic CRITICAL. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **6 total attempts per track** (2 standard on Sonnet, then up to 2 Opus 5.5 elite, then up to 2 Fable elite — each escalation round gated separately, each gated by a three-check that confirms another round would actually help). If the reviewer determines the spec or a test asserts the wrong thing, the loop halts to the user for a spec fix rather than letting the coder edit the test green.
 4. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
 5. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 6-attempt cap.
 6. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` (authored by odin from the run transcripts) alongside structured run telemetry in `metadata.telemetry`.

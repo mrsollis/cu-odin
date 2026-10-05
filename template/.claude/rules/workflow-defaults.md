@@ -71,7 +71,7 @@ Every gate has a trigger evaluated against planned scope; **gates fire only on m
 
 ### Coder ↔ reviewer loop (fail-driven)
 - A clean `APPROVED` **exits with zero iterations** — the cap is a ceiling, not a target.
-- **6 attempts max per track:** 2 standard (sonnet 5) → up to 2 opus-4.8-elite → up to 2 fable-elite. Each escalation round is gated by a three-check (reasoning-depth failure? findings actually correct? any progress?); any **no** → halt rather than escalate.
+- **6 attempts max per track:** 2 standard (sonnet) → up to 2 opus-5.5-elite → up to 2 fable-elite. Each escalation round is gated by a three-check (reasoning-depth failure? findings actually correct? any progress?); any **no** → halt rather than escalate.
 - Only **CRITICAL** findings block. HIGH / MEDIUM / LOW are advisory and accumulate for QA handoff.
 - The coder must never weaken, skip, or delete an existing test to force a pass; the reviewer runs a test-integrity check every cycle and flags any such change as an automatic CRITICAL.
 

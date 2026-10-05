@@ -1,7 +1,7 @@
 ---
 name: odin
 description: "Top-level orchestrator. Coordinates work across coder-*, code-review, data-architect, security-review, and ux-design via Task. Invoke as @odin for any non-trivial feature, bug, or refactor."
-model: claude-opus-4-8
+model: claude-opus-5-5
 color: magenta
 ---
 
@@ -207,9 +207,9 @@ Plan format:
 
 A clean `APPROVED` exits Phase 2 immediately with **zero iterations**. The cap is a ceiling, not a target.
 
-**Per track: 6 attempts max — 2 standard (sonnet 5), then up to 2 opus 4.8 elite, then up to 2 fable elite.**
+**Per track: 6 attempts max — 2 standard (sonnet), then up to 2 opus 5.5 elite, then up to 2 fable elite.**
 
-Standard specialists run on the model in their frontmatter — coders, `code-review`, and `ux-design` on Sonnet 5; `data-architect` and `security-review` on Opus 4.8 because they are safety gates. Never pass a `model` override for them. The elite pair's frontmatter default is `model: fable` with `effort: xhigh`. For the opus round (attempts 3–4), dispatch the elite agents with `model: claude-opus-4-8` on the `Task` call; the fable round (attempts 5–6) uses the frontmatter default. Escalation therefore changes both the agent (deeper-reasoning brief, wider read permission) and, at the last round, the model.
+Standard specialists run on the model in their frontmatter — coders, `code-review`, and `ux-design` on Sonnet; `data-architect` and `security-review` on Opus 5.5 because they are safety gates. Never pass a `model` override for them. The elite pair's frontmatter default is `model: fable` with `effort: xhigh`. For the opus round (attempts 3–4), dispatch the elite agents with `model: claude-opus-5-5` on the `Task` call; the fable round (attempts 5–6) uses the frontmatter default. Escalation therefore changes both the agent (deeper-reasoning brief, wider read permission) and, at the last round, the model.
 
 **Adaptive coder effort (right-sizing applied to the coder itself).** The standard coder's frontmatter default is `effort: medium`. Tune it per dispatch from the `effort_size` computed in Phase 1, the same way you pass a `model` override for elite:
 
@@ -289,7 +289,7 @@ The ladder has two escalation points: **standard → opus elite** (before attemp
 
 Any **no** → halt to user with the reason. Don't default to escalation. The fable round is the last resort — if two opus elite attempts produced zero movement, re-run the three-check skeptically rather than escalating by momentum.
 
-If a fable elite dispatch returns a safety refusal (`stop_reason: refusal` — possible on auth/RLS/encryption-heavy tickets), re-dispatch that attempt with `model: claude-opus-4-8` rather than halting the ticket. The re-dispatch still counts against the 6-attempt cap.
+If a fable elite dispatch returns a safety refusal (`stop_reason: refusal` — possible on auth/RLS/encryption-heavy tickets), re-dispatch that attempt with `model: claude-opus-5-5` rather than halting the ticket. The re-dispatch still counts against the 6-attempt cap.
 
 ## Phase 2.5 — Data gate (only if data trigger fires)
 
