@@ -8,6 +8,8 @@ version: 1.1.0
 
 Creates a row in `public.tickets`. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in.
 
+**Tracker backend.** If `.claude/ticket-tracker.json` says `"backend": "firebase"`, tickets live in Firestore: follow [ticket-firestore.md](../../rules/ticket-firestore.md) for every ticket read/write — through the Firebase MCP only, never scripts/CLI/SDKs — in place of the SQL below. Everything else in this skill is unchanged. Images: read each file and base64-encode it into the `images` subcollection (≤ 5, ≤ ~700 KB each).
+
 ## When to use
 
 When the user asks to create a ticket, track work, or file an issue.

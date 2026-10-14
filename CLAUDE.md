@@ -32,7 +32,7 @@ CLAUDE.md
 │   ├── domain.md                # PLACEHOLDER — fill in your project brief
 │   └── design-system/           # PLACEHOLDER — drop your design system here
 └── assets/
-    └── ticket-system/           # Supabase ticket-table schema (replaces Linear/Jira)
+    └── ticket-system/           # Supabase ticket-table schema (replaces Linear/Jira; Firebase-only projects use Firestore via MCP)
 ```
 
 The installer only copies the agents you need: one coder per stack (`coder-web` for Next.js/Node, `coder-react` for a React SPA, `coder-flutter` for Flutter, `coder-python` for Python — several for multi-stack repos) and one data agent per backend (`data-architect` for Supabase, `firebase-architect` for Firebase). Stack and backend are independent, so Flutter + Supabase, Flutter + Firebase, React + Firebase, Next.js + Supabase, etc. all work.
@@ -121,7 +121,7 @@ If a repo contains several, odin splits work into per-stack sub-tracks.
 - Claude Code (any recent version)
 - An Anthropic org with standard (30-day) data retention — the elite agents' fable round (attempts 5–6) runs on Fable, which returns API errors on zero-data-retention orgs
 - Node 16.7+ (only for the installer)
-- For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code (also for Firebase-backed apps — the tracker runs on Supabase)
+- For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code — or, for Firebase-only projects, a Firebase MCP server with Firestore read/write (tickets then live in Firestore; see `.claude/rules/ticket-firestore.md`)
 - For Firebase apps: the Firebase CLI, and optionally the Firebase MCP server (`npx -y firebase-tools mcp`) so `firebase-architect` can introspect live rules/data
 
 ## Updating the harness in a project

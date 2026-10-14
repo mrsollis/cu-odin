@@ -135,7 +135,34 @@ async function main() {
   applyGroup(groups.tickets, decisions.tickets, created, overwritten, skipped);
   applyGroup(groups.benchmarks, decisions.benchmarks, created, overwritten, skipped);
 
-  printSummary({ created, overwritten, skipped, backends });
+  const firestoreTickets = configureTicketTracker(backends, created);
+
+  printSummary({ created, overwritten, skipped, backends, firestoreTickets });
+}
+
+// Firebase-only projects keep tickets in Firestore (via the Firebase MCP) so they don't
+// need a Supabase project just for the tracker. Host-owned file: written once, never
+// overwritten — delete it or set "backend": "supabase" to switch back.
+function configureTicketTracker(backends, created) {
+  const file = path.join(targetDir, ".claude", "ticket-tracker.json");
+  if (fs.existsSync(file)) {
+    try {
+      return JSON.parse(fs.readFileSync(file, "utf8")).backend === "firebase";
+    } catch {
+      return false;
+    }
+  }
+  if (!(backends.length === 1 && backends[0] === "firebase")) return false;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  let projectId = "<your-firebase-project-id>";
+  try {
+    projectId = JSON.parse(fs.readFileSync(path.join(targetDir, ".firebaserc"), "utf8")).projects?.default || projectId;
+  } catch {
+    // No .firebaserc yet — leave the placeholder for the user to fill in.
+  }
+  fs.writeFileSync(file, JSON.stringify({ backend: "firebase", projectId, collection: "odin_tickets" }, null, 2) + "\n");
+  created.push(path.join(".claude", "ticket-tracker.json"));
+  return true;
 }
 
 function collectFiles(filter) {
@@ -159,7 +186,9 @@ function detectStack(dir) {
   const has = (rel) => fs.existsSync(path.join(dir, rel));
   const deps = readPackageDeps(path.join(dir, "package.json"));
   const pubspec = has("pubspec.yaml") ? fs.readFileSync(path.join(dir, "pubspec.yaml"), "utf8") : "";
-  const pythonManifests = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "Pipfile", "uv.lock", "poetry.lock"];
+  // Root manifests plus Firebase's Python functions dir (functions/main.py + requirements.txt).
+  const pythonManifests = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "Pipfile", "uv.lock", "poetry.lock"]
+    .flatMap((f) => [f, path.join("functions", f)]);
   // Concatenated Python manifests, scanned only for backend SDK names.
   const pyDeps = pythonManifests.filter(has).map((f) => fs.readFileSync(path.join(dir, f), "utf8")).join("\n");
 
@@ -179,7 +208,7 @@ function detectStack(dir) {
     firebaseFiles.some(has) ||
     (deps && firebaseDeps.some((d) => deps.has(d))) ||
     /^\s*(firebase_core|cloud_firestore|firebase_auth)\s*:/m.test(pubspec) ||
-    /\bfirebase[-_]admin\b|\bgoogle-cloud-firestore\b/i.test(pyDeps)
+    /\bfirebase[-_](admin|functions)\b|\bgoogle-cloud-firestore\b/i.test(pyDeps)
   ) {
     backends.push("firebase");
   }
@@ -443,7 +472,7 @@ function applyGroup(group, mode, created, overwritten, skipped) {
   }
 }
 
-function printSummary({ created, overwritten, skipped, backends }) {
+function printSummary({ created, overwritten, skipped, backends, firestoreTickets }) {
   console.log("");
   if (created.length) {
     console.log(`Created (${created.length}):`);
@@ -463,10 +492,14 @@ Next steps:
   1. Edit .claude/rules/domain.md with your project's brief.
   2. Replace .claude/rules/design-system/* with your design system, or write
      it from scratch using the structure described in design-system/README.md.
-  3. Apply .claude/assets/ticket-system/schema.sql to a Supabase project
-     (see that folder's README). The ticket tracker runs on Supabase even
-     when your app's backend is Firebase.${backends.includes("firebase") ? `
-  3b. Firebase: configure the Firebase MCP server (npx -y firebase-tools mcp)
+  3. ${firestoreTickets
+    ? `Tickets live in Firestore (.claude/ticket-tracker.json — check projectId).
+     Add the Firebase MCP:  claude mcp add firebase -- npx -y firebase-tools@latest mcp
+     sign in (firebase login), and add the rules block from
+     .claude/rules/ticket-firestore.md to firestore.rules.`
+    : `Apply .claude/assets/ticket-system/schema.sql to a Supabase project
+     (see that folder's README).`}${backends.includes("firebase") ? `
+  3b. Firebase: configure the Firebase MCP server (npx -y firebase-tools@latest mcp)
      in Claude Code so firebase-architect can introspect rules and data, and
      keep firestore.rules / storage.rules / firestore.indexes.json in the repo.` : ""}
   4. Open Claude Code in this repo. The orchestrator (odin) auto-loads via
