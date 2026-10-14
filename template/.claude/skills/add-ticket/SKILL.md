@@ -1,14 +1,15 @@
 ---
 name: add-ticket
-description: Add a ticket to the project's Supabase tickets table. Used to file work for the @odin orchestrator and the /process-ticket queue runner. Supports up to 5 image attachments.
+description: Add a ticket to the project's ticket tracker — the Supabase tickets table, or Firestore via the Firebase MCP for Firebase-only projects. Used to file work for the @odin orchestrator and the /process-ticket queue runner. Supports up to 5 image attachments.
 version: 1.1.0
 ---
 
 # Add Ticket
 
-Creates a row in `public.tickets`. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in.
+Creates a ticket in the project's tracker. **Resolve the tracker first:** read `.claude/ticket-tracker.json` (walk up to the repo root).
 
-**Tracker backend.** If `.claude/ticket-tracker.json` says `"backend": "firebase"`, tickets live in Firestore: follow [ticket-firestore.md](../../rules/ticket-firestore.md) for every ticket read/write — through the Firebase MCP only, never scripts/CLI/SDKs — in place of the SQL below. Everything else in this skill is unchanged. Images: read each file and base64-encode it into the `images` subcollection (≤ 5, ≤ ~700 KB each).
+- **Absent, or `"backend": "supabase"`** → insert a row in `public.tickets` via the Supabase MCP `execute_sql` tool (steps below). The project id comes from the Supabase MCP config.
+- **`"backend": "firebase"`** → create the ticket in Firestore with the Firebase MCP's `firestore_*` tools, following the "Create" recipe in [ticket-firestore.md](../../rules/ticket-firestore.md). Same fields, defaults, and dependency rules; images go in the ticket's `images` subcollection (≤ 5, ≤ ~700 KB each, base64). Use only the MCP — never `execute_sql`, scripts, the CLI, or SDKs. If the `firestore_*` tools aren't available, stop and tell the user to add the Firebase MCP (`npx -y firebase-tools@latest mcp`).
 
 ## When to use
 
@@ -29,7 +30,7 @@ When the user asks to create a ticket, track work, or file an issue.
 
    Do **not** ask the user for an `id` — the database assigns it via `next_ticket_id()` (`T-1`, `T-2`, …).
 
-2. Insert via the Supabase MCP `execute_sql` tool. Omit `id` so the column default fires; capture the assigned id from `RETURNING`:
+2. Insert via the Supabase MCP `execute_sql` tool (Firestore tracker: "Create" recipe in [ticket-firestore.md](../../rules/ticket-firestore.md) instead). Omit `id` so the column default fires; capture the assigned id from `RETURNING`:
 
 ```sql
 INSERT INTO public.tickets
@@ -53,7 +54,7 @@ RETURNING id;
 - Status defaults to `'backlog'`. Do not set it on creation.
 - `images` defaults to `'[]'` — omit it from the column list entirely when the ticket has no attachments.
 
-3. **Validate dependencies.** The DB trigger `trg_validate_ticket_deps` enforces that all ids in `depends_on` reference existing tickets and that a ticket cannot depend on itself. If the INSERT fails with `unknown ticket ids in depends_on: {…}`, check for typos or create the missing tickets first.
+3. **Validate dependencies.** (Firestore tracker: the recipe checks each `depends_on` id with `firestore_get_document` before creating.) The DB trigger `trg_validate_ticket_deps` enforces that all ids in `depends_on` reference existing tickets and that a ticket cannot depend on itself. If the INSERT fails with `unknown ticket ids in depends_on: {…}`, check for typos or create the missing tickets first.
 
 4. Confirm the ticket was created and show the assigned id back to the user. If the ticket has dependencies, note which ones must complete before it becomes ready in the queue. If images were attached, confirm the count (e.g. "2 images attached").
 
