@@ -56,8 +56,8 @@ Every gate has a trigger evaluated against planned scope; **gates fire only on m
 | Phase 0 — ux-design | new screen / flow / nav / copy change | **skip** |
 | Phase 1 — multi-planner | >2 subsystems, cross-stack, or new public API | **single planner** |
 | Phase 2 — separate-context review | scope >10 files or cross-cutting refactor | **inline review** (coder + reviewer share context) |
-| Phase 1/2.5 — data-architect | `*.sql`, `supabase/migrations/`, RLS/schema/index/policy edits | **skip** |
-| Phase 3 — security-review | auth, session/token, new public route, new RLS, secret handling, trust-boundary IO | **skip** |
+| Phase 1/2.5 — data agent (`data-architect` / `firebase-architect`) | Supabase: `*.sql`, `supabase/migrations/`, RLS/schema/index/policy edits. Firebase: `*.rules`, `firestore.indexes.json`, `firebase.json`, `functions/**`, new collection or document-shape change | **skip** |
+| Phase 3 — security-review | auth, session/token, new public route, new RLS or Security Rules, custom claims, callable/HTTP Cloud Function, secret handling, trust-boundary IO | **skip** |
 | Phase 3.5 — evaluator | ≥3 gates active **and** data + security both fired | **skip** |
 | Elite escalation | standard loop fails after 2 attempts **and** three-check passes | **halt to user** |
 
@@ -86,7 +86,7 @@ Every gate has a trigger evaluated against planned scope; **gates fire only on m
 - **Output:** no preamble or prose narration, and never echoes specialist handoffs — but emits a **one-line heartbeat** as each phase starts and clears (`→ security-review…`, `✓ security-review — secure`) so the run never goes silently dark between the plan post and QA handoff.
 
 ### Image attachments (default when present)
-- A ticket may carry ≤ 5 images (`images` column). When the dispatcher's handoff includes an image manifest, odin **reads them at intake** — before sizing/planning — and routes each into the brief of the specialist it informs (bug shot → coder, mockup → ux-design, data diagram → data-architect). No attachments → nothing changes.
+- A ticket may carry ≤ 5 images (`images` column). When the dispatcher's handoff includes an image manifest, odin **reads them at intake** — before sizing/planning — and routes each into the brief of the specialist it informs (bug shot → coder, mockup → ux-design, data diagram → data agent). No attachments → nothing changes.
 
 ---
 

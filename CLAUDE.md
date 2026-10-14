@@ -8,7 +8,7 @@ npx -y github:mrsollis/cu-odin
 
 > Not yet published to the npm registry, so install via the GitHub spec above. Do **not** add `@latest` — for `github:` specs, npm treats the part after `@` as a git ref, and there's no ref called `latest`. To pin to a release, use `github:mrsollis/cu-odin#v0.1.0`.
 
-That's it. The installer asks three quick questions (stub in domain? stub in design-system? overwrite agents?), then drops the harness into your repo. Edit `.claude/rules/domain.md` and `.claude/rules/design-system/*` for your project, and you're running.
+That's it. The installer detects your stack and backend, confirms them (`nextjs` / `react` / `flutter`; `supabase` / `firebase`), asks a few quick questions (stub in domain? stub in design-system? overwrite agents?), then drops the harness into your repo. Skip the stack/backend prompts with `--stack react,flutter --backend firebase`. Edit `.claude/rules/domain.md` and `.claude/rules/design-system/*` for your project, and you're running.
 
 ## What you get
 
@@ -18,11 +18,13 @@ CLAUDE.md
 ├── agents/
 │   ├── odin.md                  # orchestrator (opus 5.5) — auto-loaded by CLAUDE.md
 │   ├── coder-web.md             # Node/TS/Next.js implementer (sonnet)
+│   ├── coder-react.md           # React SPA implementer — Vite/CRA, router, TanStack Query (sonnet)
 │   ├── coder-flutter.md         # Dart/Flutter implementer (sonnet)
 │   ├── coder-elite.md           # escalation coder (gated; opus 5.5 → fable)
 │   ├── code-review.md           # standard reviewer (sonnet)
 │   ├── code-review-elite.md     # escalation reviewer (gated; opus 5.5 → fable)
 │   ├── data-architect.md        # Supabase schema / RLS / data security (opus 5.5)
+│   ├── firebase-architect.md    # Firestore model / Security Rules / indexes / Functions (opus 5.5)
 │   ├── security-review.md       # OWASP-focused review (opus 5.5)
 │   └── ux-design.md             # design spec producer (sonnet)
 ├── rules/
@@ -32,9 +34,7 @@ CLAUDE.md
     └── ticket-system/           # Supabase ticket-table schema (replaces Linear/Jira)
 ```
 
-The installer detects `package.json` or `pubspec.yaml` and only copies the coder file you actually need (`coder-web` for web, `coder-flutter` for Flutter, both for fullstack repos).
-
-Stack is auto-detected from the repo: `package.json` → web track, `pubspec.yaml` → Flutter track.
+The installer only copies the agents you need: one coder per stack (`coder-web` for Next.js/Node, `coder-react` for a React SPA, `coder-flutter` for Flutter — several for multi-stack repos) and one data agent per backend (`data-architect` for Supabase, `firebase-architect` for Firebase). Stack and backend are independent, so Flutter + Supabase, Flutter + Firebase, React + Firebase, Next.js + Supabase, etc. all work.
 
 ## How odin works
 
@@ -44,7 +44,7 @@ For any non-trivial request, odin runs a multi-phase loop without you needing to
 1. **Phase 0 — Design gate** (UI features only). Spawns `ux-design` if no spec exists.
 2. **Phase 1 — Planning.** Parallel planning subagents, then synthesis into one plan with parallel execution tracks. Odin authors a flat list of acceptance criteria into `metadata.acceptance_criteria`; this is what the coder implements against and what `code-review` checks the implementation against. `data-architect` joins as a planner whenever the work touches the data layer. Plan is always posted publicly.
 3. **Phase 2 — Coder ↔ reviewer loop** per track, strictly fail-driven. The coder writes tests for the acceptance criteria as part of the implementation; the reviewer verifies coverage against the AC list and runs a **test-integrity check** — any existing test weakened, skipped, or deleted to force a pass is an automatic CRITICAL. A clean `APPROVED` exits immediately with zero loops. On `NEEDS_REVISION`, odin spawns the coder again with the reviewer's findings, capped at **6 total attempts per track** (2 standard on Sonnet, then up to 2 Opus 5.5 elite, then up to 2 Fable elite — each escalation round gated separately, each gated by a three-check that confirms another round would actually help). If the reviewer determines the spec or a test asserts the wrong thing, the loop halts to the user for a spec fix rather than letting the coder edit the test green.
-4. **Phase 2.5 — Data gate.** One pass of `data-architect` across migrations, RLS, and data-access changes (skipped if the diff has none).
+4. **Phase 2.5 — Data gate.** One pass of the backend's data agent — `data-architect` (migrations, RLS) or `firebase-architect` (Security Rules, indexes, Functions, emulator rules tests) — across data-access changes (skipped if the diff has none).
 5. **Phase 3 — Security gate.** One pass of `security-review` across all changed files. On findings, odin spawns one targeted coder fix scoped to the security findings, then re-runs `security-review` (not full code-review). The fix counts against the same per-track 6-attempt cap.
 6. **Phase 4 — QA handoff.** Ticket → `qa`, writes a QA testing checklist into `metadata.qa.checklist`. On Phase 5 ship, a friendly "what changed" note is saved to `metadata.outcome` (authored by odin from the run transcripts) alongside structured run telemetry in `metadata.telemetry`.
 7. **Phase 5 — Ship** (user-triggered only). Commit, then **offer to merge into the default branch** (`--auto-merge` merges without asking, local only; `--push` also pushes; headless merges only with `--auto-merge`), ticket → `complete`.
@@ -91,9 +91,10 @@ You usually don't — odin handles routing. But for the rare case you want to ca
 |-------|---------------------|
 | `@odin` | Same as the default, but explicit. Useful if you've drifted out of orchestrator behavior. |
 | `@ux-design` | You want a design spec but no implementation yet. |
-| `@coder-web` / `@coder-flutter` | You want implementation only, bypassing planning (rare; usually a mistake). |
+| `@coder-web` / `@coder-react` / `@coder-flutter` | You want implementation only, bypassing planning (rare; usually a mistake). |
 | `@code-review` | Review pending changes without implementing fixes. Includes a test-integrity check (flags any weakened/skipped/deleted existing test). |
-| `@data-architect` | One-off data-layer audit (schema, RLS, indexes, migrations) on the current branch. |
+| `@data-architect` | One-off Supabase data-layer audit (schema, RLS, indexes, migrations) on the current branch. |
+| `@firebase-architect` | One-off Firebase audit (Security Rules, indexes, data model, Cloud Functions) on the current branch. |
 | `@security-review` | One-off security audit of the current branch. |
 
 The two `*-elite` agents (`coder-elite`, `code-review-elite`) are reserved for odin to spawn during escalation — don't invoke them directly.
@@ -102,17 +103,24 @@ The two `*-elite` agents (`coder-elite`, `code-review-elite`) are reserved for o
 
 | Stack | Detected by | Coder | Quality gates |
 |-------|-------------|-------|----------------|
-| Node / TS / Next.js | `package.json` present | `coder-web` | `yarn lint` / `type-check` / `test` / `build` |
+| Node / TS / Next.js | `package.json` with `next` (or no `react`) | `coder-web` | `lint` / `type-check` / `test` / `build` (whichever are defined) |
+| React SPA | `package.json` with `react`, no `next` | `coder-react` | `lint` / `type-check` / `test` / `build` (whichever are defined) |
 | Flutter / Dart | `pubspec.yaml` present | `coder-flutter` | `dart format` / `flutter analyze` / `flutter test` |
 
-If a repo contains both, odin splits work into per-stack sub-tracks.
+If a repo contains several, odin splits work into per-stack sub-tracks.
+
+| Backend | Detected by | Data agent | Gate checks |
+|---------|-------------|------------|-------------|
+| Supabase | `supabase/`, `@supabase/*`, `supabase_flutter` | `data-architect` | migrations, RLS, `get_advisors` |
+| Firebase | `firebase.json`, `.firebaserc`, `*.rules`, `firebase`/`firebase-admin`, `firebase_core` | `firebase-architect` | Security Rules + emulator rules tests, indexes, Functions auth |
 
 ## Requirements
 
 - Claude Code (any recent version)
 - An Anthropic org with standard (30-day) data retention — the elite agents' fable round (attempts 5–6) runs on Fable, which returns API errors on zero-data-retention orgs
 - Node 16.7+ (only for the installer)
-- For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code
+- For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code (also for Firebase-backed apps — the tracker runs on Supabase)
+- For Firebase apps: the Firebase CLI, and optionally the Firebase MCP server (`npx -y firebase-tools mcp`) so `firebase-architect` can introspect live rules/data
 
 ## Updating the harness in a project
 

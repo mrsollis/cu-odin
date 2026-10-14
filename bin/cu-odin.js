@@ -26,6 +26,19 @@ if (cmd !== "init") {
   process.exit(1);
 }
 
+const STACKS = ["nextjs", "react", "flutter"];
+const BACKENDS = ["supabase", "firebase"];
+
+const STACK_ALIASES = {
+  nextjs: "nextjs", "next.js": "nextjs", next: "nextjs", web: "nextjs", node: "nextjs", n: "nextjs",
+  react: "react", spa: "react", "react-spa": "react", vite: "react", r: "react",
+  flutter: "flutter", dart: "flutter", f: "flutter",
+};
+const BACKEND_ALIASES = {
+  supabase: "supabase", postgres: "supabase", s: "supabase",
+  firebase: "firebase", firestore: "firebase", fb: "firebase", f: "firebase",
+};
+
 const templateDir = path.join(__dirname, "..", "template");
 const targetDir = process.cwd();
 
@@ -43,21 +56,12 @@ async function main() {
   console.log(`\ncu-odin: installing harness into ${targetDir}\n`);
 
   const detected = detectStack(targetDir);
-  const detectedDefault = detected.web && !detected.flutter
-    ? "nextjs"
-    : detected.flutter && !detected.web
-      ? "flutter"
-      : null;
-  if (detectedDefault) {
-    console.log(`  Detected stack: ${detectedDefault === "nextjs" ? "web (package.json present)" : "flutter (pubspec.yaml present)"}.\n`);
-  } else if (detected.web && detected.flutter) {
-    console.log(`  Detected stack: fullstack (both package.json and pubspec.yaml present).\n`);
-  } else {
-    console.log(`  No stack detected (no package.json or pubspec.yaml).\n`);
-  }
+  console.log(`  Detected stack: ${detected.stacks.length ? detected.stacks.join(" + ") : "none (no package.json or pubspec.yaml)"}.`);
+  console.log(`  Detected backend: ${detected.backends.length ? detected.backends.join(" + ") : "none"}.\n`);
 
-  const stack = await promptStack(detectedDefault);
-  console.log(`  Installing coder + coder-elite for: ${stack}\n`);
+  const stacks = await promptStacks(detected.stacks);
+  const backends = await promptBackends(detected.backends);
+  console.log(`  Installing coders for: ${stacks.join(" + ")}; data agent for: ${backends.join(" + ")}\n`);
 
   // Categories the user gets to decide on, plus ticket assets which copy-if-missing
   // without prompting (versioned schema, no per-project edits).
@@ -70,7 +74,7 @@ async function main() {
       label: ".claude/agents/",
       files: collectFiles((rel) =>
         rel.startsWith(path.join(".claude", "agents") + path.sep) &&
-        agentForStack(rel, stack)
+        agentForSelection(rel, stacks, backends)
       ),
     },
     domain: {
@@ -130,7 +134,7 @@ async function main() {
   applyGroup(groups.tickets, decisions.tickets, created, overwritten, skipped);
   applyGroup(groups.benchmarks, decisions.benchmarks, created, overwritten, skipped);
 
-  printSummary({ created, overwritten, skipped });
+  printSummary({ created, overwritten, skipped, backends });
 }
 
 function collectFiles(filter) {
@@ -148,37 +152,121 @@ function collectFiles(filter) {
   }
 }
 
+// Best-effort detection from manifests and config files. Every result is only a
+// default for the prompts below — the user (or --stack/--backend) has the final say.
 function detectStack(dir) {
-  return {
-    web: fs.existsSync(path.join(dir, "package.json")),
-    flutter: fs.existsSync(path.join(dir, "pubspec.yaml")),
-  };
+  const has = (rel) => fs.existsSync(path.join(dir, rel));
+  const deps = readPackageDeps(path.join(dir, "package.json"));
+  const pubspec = has("pubspec.yaml") ? fs.readFileSync(path.join(dir, "pubspec.yaml"), "utf8") : "";
+
+  const stacks = [];
+  if (deps) {
+    // A package.json with neither next nor react is a plain Node project — coder-web covers it.
+    if (deps.has("next") || !deps.has("react")) stacks.push("nextjs");
+    else stacks.push("react");
+  }
+  if (pubspec) stacks.push("flutter");
+
+  const backends = [];
+  const firebaseFiles = ["firebase.json", ".firebaserc", "firestore.rules", "storage.rules", "database.rules.json"];
+  const firebaseDeps = ["firebase", "firebase-admin", "reactfire", "@react-native-firebase/app"];
+  if (
+    firebaseFiles.some(has) ||
+    (deps && firebaseDeps.some((d) => deps.has(d))) ||
+    /^\s*(firebase_core|cloud_firestore|firebase_auth)\s*:/m.test(pubspec)
+  ) {
+    backends.push("firebase");
+  }
+  if (
+    has("supabase") ||
+    (deps && [...deps].some((d) => d.startsWith("@supabase/"))) ||
+    /^\s*supabase_flutter\s*:/m.test(pubspec)
+  ) {
+    backends.push("supabase");
+  }
+
+  return { stacks, backends };
 }
 
-// Filter agent files by chosen stack ("nextjs" or "flutter"). Only the coder for the
-// chosen stack is installed. coder-elite is shared across stacks and always installs,
-// alongside the other stack-agnostic agents (ux-design, data-architect,
-// security-review, code-review, odin).
-function agentForStack(rel, stack) {
+function readPackageDeps(file) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+    return new Set([
+      ...Object.keys(pkg.dependencies || {}),
+      ...Object.keys(pkg.devDependencies || {}),
+      ...Object.keys(pkg.peerDependencies || {}),
+    ]);
+  } catch {
+    return new Set();
+  }
+}
+
+// Filter agent files by the chosen stacks and backends. One coder per selected stack
+// and one data agent per selected backend; everything else (odin, coder-elite,
+// code-review*, security-review, ux-design) is stack-agnostic and always installs.
+function agentForSelection(rel, stacks, backends) {
   const filename = path.basename(rel);
-  if (filename === "coder-web.md") return stack === "nextjs";
-  if (filename === "coder-flutter.md") return stack === "flutter";
+  if (filename === "coder-web.md") return stacks.includes("nextjs");
+  if (filename === "coder-react.md") return stacks.includes("react");
+  if (filename === "coder-flutter.md") return stacks.includes("flutter");
+  if (filename === "data-architect.md") return backends.includes("supabase");
+  if (filename === "firebase-architect.md") return backends.includes("firebase");
   return true;
 }
 
-async function promptStack(detectedDefault) {
-  const def = detectedDefault || "nextjs";
+function flagValue(name) {
+  const eq = args.find((a) => a.startsWith(`--${name}=`));
+  if (eq) return eq.slice(name.length + 3);
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 && args[i + 1] && !args[i + 1].startsWith("-") ? args[i + 1] : null;
+}
 
+// Parses "react, flutter" / "both" / aliases into a deduped list of canonical names.
+// Returns null when nothing recognizable was given, so the caller falls back to the default.
+function parseChoices(raw, aliases, allValue) {
+  if (!raw) return null;
+  const out = [];
+  for (const token of raw.toLowerCase().split(/[\s,+/]+/).filter(Boolean)) {
+    const mapped = token === "both" || token === "all" ? allValue : aliases[token];
+    if (!mapped) continue;
+    for (const m of [].concat(mapped)) if (!out.includes(m)) out.push(m);
+  }
+  return out.length ? out : null;
+}
+
+async function promptStacks(detected) {
+  const def = detected.length ? detected : ["nextjs"];
+  const fromFlag = parseChoices(flagValue("stack"), STACK_ALIASES, STACKS);
+  if (fromFlag) {
+    console.log(`  Stack: ${fromFlag.join(" + ")} (--stack)`);
+    return fromFlag;
+  }
   if (acceptDefaults || !process.stdin.isTTY) {
-    console.log(`  Stack: ${def} (default)`);
+    console.log(`  Stack: ${def.join(" + ")} (default)`);
     return def;
   }
+  const answer = await promptText(
+    `  Which stack(s)? nextjs / react (SPA) / flutter — comma-separate for several (default: ${def.join(",")}) `
+  );
+  return parseChoices(answer, STACK_ALIASES, STACKS) || def;
+}
 
-  const answer = await promptText(`  Is this project Next.js or Flutter? [nextjs/flutter] (default: ${def}) `);
-  const trimmed = answer.trim().toLowerCase();
-  if (["nextjs", "next.js", "next", "web", "n"].includes(trimmed)) return "nextjs";
-  if (["flutter", "f"].includes(trimmed)) return "flutter";
-  return def;
+async function promptBackends(detected) {
+  const def = detected.length ? detected : ["supabase"];
+  const fromFlag = parseChoices(flagValue("backend"), BACKEND_ALIASES, BACKENDS);
+  if (fromFlag) {
+    console.log(`  Backend: ${fromFlag.join(" + ")} (--backend)`);
+    return fromFlag;
+  }
+  if (acceptDefaults || !process.stdin.isTTY) {
+    console.log(`  Backend: ${def.join(" + ")} (default)`);
+    return def;
+  }
+  const answer = await promptText(
+    `  Which backend? supabase / firebase / both (default: ${def.join(",")}) `
+  );
+  return parseChoices(answer, BACKEND_ALIASES, BACKENDS) || def;
 }
 
 function promptText(question) {
@@ -347,7 +435,7 @@ function applyGroup(group, mode, created, overwritten, skipped) {
   }
 }
 
-function printSummary({ created, overwritten, skipped }) {
+function printSummary({ created, overwritten, skipped, backends }) {
   console.log("");
   if (created.length) {
     console.log(`Created (${created.length}):`);
@@ -367,8 +455,12 @@ Next steps:
   1. Edit .claude/rules/domain.md with your project's brief.
   2. Replace .claude/rules/design-system/* with your design system, or write
      it from scratch using the structure described in design-system/README.md.
-  3. Apply .claude/assets/ticket-system/schema.sql to your Supabase project,
-     then seed the suggestions ledger ticket (see that folder's README).
+  3. Apply .claude/assets/ticket-system/schema.sql to a Supabase project
+     (see that folder's README). The ticket tracker runs on Supabase even
+     when your app's backend is Firebase.${backends.includes("firebase") ? `
+  3b. Firebase: configure the Firebase MCP server (npx -y firebase-tools mcp)
+     in Claude Code so firebase-architect can introspect rules and data, and
+     keep firestore.rules / storage.rules / firestore.indexes.json in the repo.` : ""}
   4. Open Claude Code in this repo. The orchestrator (odin) auto-loads via
      CLAUDE.md — invoke it for any non-trivial task.
 
@@ -397,8 +489,11 @@ Usage:
   npx -y github:mrsollis/cu-odin             Install harness into current directory (interactive)
   npx -y github:mrsollis/cu-odin init        Same as default
   npx -y github:mrsollis/cu-odin init --yes  Accept all defaults non-interactively
+  npx -y github:mrsollis/cu-odin --stack react --backend firebase
 
 Interactive prompts (Enter accepts the default):
+  - Stack(s): nextjs / react / flutter       (default: detected, else nextjs)
+  - Backend: supabase / firebase / both      (default: detected, else supabase)
   - Overwrite agents + CLAUDE.md?            (default: yes)
   - Overwrite vendored rules / benchmarks?   (default: yes)
   - Overwrite .claude/skills/?               (default: yes)
@@ -407,8 +502,10 @@ Interactive prompts (Enter accepts the default):
   - Stub in .claude/rules/design-system/?    (default: no if it exists, yes if not)
 
 Options:
-  -y, --yes        Accept defaults non-interactively (safest in CI)
-  -h, --help       Show this help
-  -v, --version    Print package version
+  -y, --yes            Accept defaults non-interactively (safest in CI)
+  --stack <list>       nextjs, react, flutter (comma-separated) — skips the stack prompt
+  --backend <list>     supabase, firebase, or both — skips the backend prompt
+  -h, --help           Show this help
+  -v, --version        Print package version
 `);
 }
