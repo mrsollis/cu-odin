@@ -100,11 +100,12 @@ Resolve once at session start from the repo (re-check per ticket only if the tic
 | `package.json` with `next` dep, or plain Node (no `react`) | `web` | `coder-web` |
 | `package.json` with `react` and no `next` (Vite / CRA / Rsbuild SPA) | `react` | `coder-react` |
 | `pubspec.yaml` | `flutter` | `coder-flutter` |
+| `pyproject.toml` / `requirements*.txt` / `setup.py` / `Pipfile` | `python` | `coder-python` |
 
 | Signal | Backend | Data agent |
 |--------|---------|------------|
-| `supabase/`, `@supabase/*` dep, `supabase_flutter` | `supabase` | `data-architect` |
-| `firebase.json` / `.firebaserc` / `*.rules`, `firebase` / `firebase-admin` dep, `firebase_core` / `cloud_firestore` | `firebase` | `firebase-architect` |
+| `supabase/`, `@supabase/*` dep, `supabase_flutter`, Python `supabase` | `supabase` | `data-architect` |
+| `firebase.json` / `.firebaserc` / `*.rules`, `firebase` / `firebase-admin` dep, `firebase_core` / `cloud_firestore`, Python `firebase-admin` | `firebase` | `firebase-architect` |
 
 "The data agent" below means whichever matches the files in scope; a repo with both backends routes each data-touching file to its own agent (parallel dispatch). If the routed agent file is missing from `.claude/agents/` (installer skipped it), emit `STATUS: HARNESS_ERROR — <agent> not installed; re-run the cu-odin installer with --stack/--backend` rather than substituting another agent. Firebase `functions/` code is implemented by the coder whose stack matches its manifest (`functions/package.json` → `coder-web`), but its trigger/authorization surface is audited by `firebase-architect`.
 
@@ -120,7 +121,7 @@ You read `CLAUDE.md`, `.claude/rules/domain.md`, and `.claude/rules/design-syste
 BRIEF_FROM: odin
 TICKET: { id, title, status }
 WORKTREE: <.worktrees/<id-lower> by default; "." only under --no-worktree>
-STACK: web | react | flutter
+STACK: web | react | flutter | python
 BACKEND: supabase | firebase   # coders, data agent, security-review; omit when no backend is involved
 TASK: <one-paragraph scope>
 ACCEPTANCE_CRITERIA: [AC-1 ...]
@@ -201,7 +202,7 @@ After synthesis:
 
 1. Author a flat **acceptance criteria** list — one item per user-visible behavior, testable, with `AC-N` ids. Persist to `metadata.acceptance_criteria`.
 2. **Compute and persist `metadata.gate_set`** — which gates fire and why, plus the `effort_size` from the sizing step, so review/audit can reconstruct the run.
-3. Identify parallel-safe tracks. Per-track stack routing: `*.tsx`/`*.ts`/`*.css`/`package.json` → the JS stack resolved above (`web` for Next.js/Node, `react` for an SPA; in a monorepo, the nearest `package.json` decides); `*.dart`/`pubspec.yaml` → flutter. Mixed tracks split into per-stack sub-tracks.
+3. Identify parallel-safe tracks. Per-track stack routing: `*.tsx`/`*.ts`/`*.css`/`package.json` → the JS stack resolved above (`web` for Next.js/Node, `react` for an SPA; in a monorepo, the nearest `package.json` decides); `*.dart`/`pubspec.yaml` → flutter; `*.py`/`pyproject.toml`/`requirements*.txt` → python. Mixed tracks split into per-stack sub-tracks.
 4. Post the plan + activated gate set. In interactive mode, wait for approval. In headless mode, proceed.
 
 Plan format:
@@ -215,7 +216,7 @@ Plan format:
 ### Activated Gates
 [as above]
 
-### Track 1 — stack: web|react|flutter
+### Track 1 — stack: web|react|flutter|python
 - Tasks, dependencies
 
 ### Sequential
@@ -243,6 +244,7 @@ This is the one lever that tunes the coder's *own* reasoning cost; it is discret
 | web | `coder-web` |
 | react | `coder-react` |
 | flutter | `coder-flutter` |
+| python | `coder-python` |
 
 Coder rules:
 

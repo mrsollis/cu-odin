@@ -215,7 +215,7 @@ The dispatcher orchestrates up to **N tickets in parallel inside this same sessi
 
 > **Why subagents, not CLI processes.** Subagents (the `Task` tool) are the right primitive for cohort parallelism. There are no separate `claude` processes to spawn, no permission prompts to stall on, no status files to poll. The "halted for an hour" failure mode is structurally impossible — there is nothing to halt.
 >
-> **No sub-Odins.** Odin is never a `Task` target. The parent session is always the only Odin. Specialists (`coder-web`, `coder-react`, `coder-flutter`, `code-review`, `data-architect`, `firebase-architect`, `security-review`, `ux-design`, plus the `*-elite` pair) are the Task targets. Subagents don't fan out further — they do their work directly. The "subagents can't spawn subagents" constraint never bites because the only fan-out point is the parent.
+> **No sub-Odins.** Odin is never a `Task` target. The parent session is always the only Odin. Specialists (`coder-web`, `coder-react`, `coder-flutter`, `coder-python`, `code-review`, `data-architect`, `firebase-architect`, `security-review`, `ux-design`, plus the `*-elite` pair) are the Task targets. Subagents don't fan out further — they do their work directly. The "subagents can't spawn subagents" constraint never bites because the only fan-out point is the parent.
 
 ### Setup (once per run)
 

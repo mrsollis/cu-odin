@@ -8,7 +8,7 @@ npx -y github:mrsollis/cu-odin
 
 > Not yet published to the npm registry, so install via the GitHub spec above. Do **not** add `@latest` — for `github:` specs, npm treats the part after `@` as a git ref, and there's no ref called `latest`. To pin to a release, use `github:mrsollis/cu-odin#v0.1.0`.
 
-That's it. The installer detects your stack and backend, confirms them (`nextjs` / `react` / `flutter`; `supabase` / `firebase`), asks a few quick questions (stub in domain? stub in design-system? overwrite agents?), then drops the harness into your repo. Skip the stack/backend prompts with `--stack react,flutter --backend firebase`. Edit `.claude/rules/domain.md` and `.claude/rules/design-system/*` for your project, and you're running.
+That's it. The installer detects your stack and backend, confirms them (`nextjs` / `react` / `flutter` / `python`; `supabase` / `firebase`), asks a few quick questions (stub in domain? stub in design-system? overwrite agents?), then drops the harness into your repo. Skip the stack/backend prompts with `--stack react,flutter --backend firebase`. Edit `.claude/rules/domain.md` and `.claude/rules/design-system/*` for your project, and you're running.
 
 ## What you get
 
@@ -20,6 +20,7 @@ CLAUDE.md
 │   ├── coder-web.md             # Node/TS/Next.js implementer (sonnet)
 │   ├── coder-react.md           # React SPA implementer — Vite/CRA, router, TanStack Query (sonnet)
 │   ├── coder-flutter.md         # Dart/Flutter implementer (sonnet)
+│   ├── coder-python.md          # Python implementer — FastAPI/Django/Flask, CLIs, workers (sonnet)
 │   ├── coder-elite.md           # escalation coder (gated; opus 5.5 → fable)
 │   ├── code-review.md           # standard reviewer (sonnet)
 │   ├── code-review-elite.md     # escalation reviewer (gated; opus 5.5 → fable)
@@ -34,7 +35,7 @@ CLAUDE.md
     └── ticket-system/           # Supabase ticket-table schema (replaces Linear/Jira)
 ```
 
-The installer only copies the agents you need: one coder per stack (`coder-web` for Next.js/Node, `coder-react` for a React SPA, `coder-flutter` for Flutter — several for multi-stack repos) and one data agent per backend (`data-architect` for Supabase, `firebase-architect` for Firebase). Stack and backend are independent, so Flutter + Supabase, Flutter + Firebase, React + Firebase, Next.js + Supabase, etc. all work.
+The installer only copies the agents you need: one coder per stack (`coder-web` for Next.js/Node, `coder-react` for a React SPA, `coder-flutter` for Flutter, `coder-python` for Python — several for multi-stack repos) and one data agent per backend (`data-architect` for Supabase, `firebase-architect` for Firebase). Stack and backend are independent, so Flutter + Supabase, Flutter + Firebase, React + Firebase, Next.js + Supabase, etc. all work.
 
 ## How odin works
 
@@ -91,7 +92,7 @@ You usually don't — odin handles routing. But for the rare case you want to ca
 |-------|---------------------|
 | `@odin` | Same as the default, but explicit. Useful if you've drifted out of orchestrator behavior. |
 | `@ux-design` | You want a design spec but no implementation yet. |
-| `@coder-web` / `@coder-react` / `@coder-flutter` | You want implementation only, bypassing planning (rare; usually a mistake). |
+| `@coder-web` / `@coder-react` / `@coder-flutter` / `@coder-python` | You want implementation only, bypassing planning (rare; usually a mistake). |
 | `@code-review` | Review pending changes without implementing fixes. Includes a test-integrity check (flags any weakened/skipped/deleted existing test). |
 | `@data-architect` | One-off Supabase data-layer audit (schema, RLS, indexes, migrations) on the current branch. |
 | `@firebase-architect` | One-off Firebase audit (Security Rules, indexes, data model, Cloud Functions) on the current branch. |
@@ -106,6 +107,7 @@ The two `*-elite` agents (`coder-elite`, `code-review-elite`) are reserved for o
 | Node / TS / Next.js | `package.json` with `next` (or no `react`) | `coder-web` | `lint` / `type-check` / `test` / `build` (whichever are defined) |
 | React SPA | `package.json` with `react`, no `next` | `coder-react` | `lint` / `type-check` / `test` / `build` (whichever are defined) |
 | Flutter / Dart | `pubspec.yaml` present | `coder-flutter` | `dart format` / `flutter analyze` / `flutter test` |
+| Python | `pyproject.toml` / `requirements*.txt` / `setup.py` / `Pipfile` | `coder-python` | `ruff` / `black` / `mypy` / `pyright` / `pytest` (whichever are configured) |
 
 If a repo contains several, odin splits work into per-stack sub-tracks.
 
