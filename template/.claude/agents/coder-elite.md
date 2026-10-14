@@ -1,6 +1,6 @@
 ---
 name: coder-elite
-description: "Escalation coder (opus 5.5 round, then fable round). Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles — dispatched at opus 5.5 for attempts 3–4, at fable for attempts 5–6. Handles web (Next.js/Node), React SPA, or Flutter — the failing track's stack is already established."
+description: "Escalation coder (opus 5.5 round, then fable round). Invoked by odin only when the standard coder-reviewer loop has failed to converge after 2 cycles — dispatched at opus 5.5 for attempts 3–4, at fable for attempts 5–6. Handles web (Next.js/Node), React SPA, Flutter, or Python — the failing track's stack is already established."
 model: fable
 effort: xhigh
 color: gold
@@ -40,9 +40,10 @@ Same as the standard coder:
 - **Web:** run only the gate scripts the project's `package.json` defines — `lint`, `typecheck` (or `type-check`, or `tsc --noEmit`), `test`, `build` (absent scripts are skipped, never run or "fixed" into existence; `build` only for Server/Client-boundary or serialization changes). Prefer repo-specific commands from the brief / `CLAUDE.md` / `domain.md`.
 - **React SPA:** same script-driven gate set as web (`lint`, `typecheck`/`type-check` or `tsc --noEmit`/`tsc -b`, `test` non-watch, `build`); run `build` when routing, lazy imports, env usage, bundler config, or dependencies change.
 - **Firebase rules** (when the track touches `*.rules`): the repo's emulator rules tests (`firebase emulators:exec ...`) must pass.
+- **Python:** only the configured gates, via the repo's runner (`uv run` / `poetry run` / venv) — `ruff check` (or flake8/pylint), `ruff format --check` / `black --check`, `mypy` / `pyright`, `pytest`; Django: `makemigrations --check --dry-run` when models change.
 - **Flutter:** `dart format --set-exit-if-changed .`, `flutter analyze`, `flutter test`, `dart run build_runner build --delete-conflicting-outputs` if applicable
 
-Stack-specific watchpoints from `coder-web.md` / `coder-react.md` / `coder-flutter.md` apply — read whichever matches.
+Stack-specific watchpoints from `coder-web.md` / `coder-react.md` / `coder-flutter.md` / `coder-python.md` apply — read whichever matches.
 
 ## Hypothesis block (always required for elite)
 

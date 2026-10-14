@@ -31,6 +31,7 @@ Quick reminder of the out-of-the-box defaults (no flags, no prompts): [.claude/r
 - `package.json` with `next` (or plain Node) → web stack. `coder-web` runs whichever of `lint`, `typecheck`/`type-check`, `test`, `build` the project's `package.json` actually defines (absent scripts are skipped, never run or "fixed" into existence).
 - `package.json` with `react` and no `next` → React SPA stack (Vite / CRA / Rsbuild). `coder-react` runs the same script-driven gates as `coder-web`.
 - `pubspec.yaml` → Flutter stack. `coder-flutter` runs `dart format`, `flutter analyze`, `flutter test`.
+- `pyproject.toml` / `requirements*.txt` / `setup.py` / `Pipfile` → Python stack. `coder-python` runs whichever of ruff/black, mypy/pyright, and pytest the repo configures.
 - Multiple present → odin splits per-stack sub-tracks.
 
 Backend (independent of stack — any combination works):
@@ -61,7 +62,7 @@ Tickets live in Supabase (regardless of the app's backend — Firebase projects 
 |-------|------|
 | [odin](.claude/agents/odin.md) | Default orchestrator. Spawn for any non-trivial feature, bug fix, or refactor. |
 | [ux-design](.claude/agents/ux-design.md) | Triggered by Phase-0 gate (new screen / flow / nav / copy change). |
-| [coder-web](.claude/agents/coder-web.md) / [coder-react](.claude/agents/coder-react.md) / [coder-flutter](.claude/agents/coder-flutter.md) | Stack-routed implementer (Next.js/Node, React SPA, Flutter). Only the ones for your stack are installed. |
+| [coder-web](.claude/agents/coder-web.md) / [coder-react](.claude/agents/coder-react.md) / [coder-flutter](.claude/agents/coder-flutter.md) / [coder-python](.claude/agents/coder-python.md) | Stack-routed implementer (Next.js/Node, React SPA, Flutter, Python). Only the ones for your stack are installed. |
 | [code-review](.claude/agents/code-review.md) | After every coder pass. Inline review on small scope, separate-context on >10 files or cross-cutting. |
 | [data-architect](.claude/agents/data-architect.md) | Supabase backend. Triggered when the diff or plan touches `*.sql`, `supabase/migrations/`, or RLS/schema/index/policy code. Mode A planner + Mode B audit. |
 | [firebase-architect](.claude/agents/firebase-architect.md) | Firebase backend. Triggered when the diff or plan touches `*.rules`, `firestore.indexes.json`, `firebase.json`, `functions/`, or Firestore/RTDB/Storage data shape. Mode A planner + Mode B audit. |

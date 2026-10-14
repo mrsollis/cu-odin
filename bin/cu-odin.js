@@ -26,13 +26,14 @@ if (cmd !== "init") {
   process.exit(1);
 }
 
-const STACKS = ["nextjs", "react", "flutter"];
+const STACKS = ["nextjs", "react", "flutter", "python"];
 const BACKENDS = ["supabase", "firebase"];
 
 const STACK_ALIASES = {
   nextjs: "nextjs", "next.js": "nextjs", next: "nextjs", web: "nextjs", node: "nextjs", n: "nextjs",
   react: "react", spa: "react", "react-spa": "react", vite: "react", r: "react",
   flutter: "flutter", dart: "flutter", f: "flutter",
+  python: "python", py: "python", p: "python", django: "python", fastapi: "python", flask: "python",
 };
 const BACKEND_ALIASES = {
   supabase: "supabase", postgres: "supabase", s: "supabase",
@@ -158,6 +159,9 @@ function detectStack(dir) {
   const has = (rel) => fs.existsSync(path.join(dir, rel));
   const deps = readPackageDeps(path.join(dir, "package.json"));
   const pubspec = has("pubspec.yaml") ? fs.readFileSync(path.join(dir, "pubspec.yaml"), "utf8") : "";
+  const pythonManifests = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "Pipfile", "uv.lock", "poetry.lock"];
+  // Concatenated Python manifests, scanned only for backend SDK names.
+  const pyDeps = pythonManifests.filter(has).map((f) => fs.readFileSync(path.join(dir, f), "utf8")).join("\n");
 
   const stacks = [];
   if (deps) {
@@ -166,6 +170,7 @@ function detectStack(dir) {
     else stacks.push("react");
   }
   if (pubspec) stacks.push("flutter");
+  if (pythonManifests.some(has)) stacks.push("python");
 
   const backends = [];
   const firebaseFiles = ["firebase.json", ".firebaserc", "firestore.rules", "storage.rules", "database.rules.json"];
@@ -173,14 +178,16 @@ function detectStack(dir) {
   if (
     firebaseFiles.some(has) ||
     (deps && firebaseDeps.some((d) => deps.has(d))) ||
-    /^\s*(firebase_core|cloud_firestore|firebase_auth)\s*:/m.test(pubspec)
+    /^\s*(firebase_core|cloud_firestore|firebase_auth)\s*:/m.test(pubspec) ||
+    /\bfirebase[-_]admin\b|\bgoogle-cloud-firestore\b/i.test(pyDeps)
   ) {
     backends.push("firebase");
   }
   if (
     has("supabase") ||
     (deps && [...deps].some((d) => d.startsWith("@supabase/"))) ||
-    /^\s*supabase_flutter\s*:/m.test(pubspec)
+    /^\s*supabase_flutter\s*:/m.test(pubspec) ||
+    /^\s*["']?supabase\b/im.test(pyDeps)
   ) {
     backends.push("supabase");
   }
@@ -210,6 +217,7 @@ function agentForSelection(rel, stacks, backends) {
   if (filename === "coder-web.md") return stacks.includes("nextjs");
   if (filename === "coder-react.md") return stacks.includes("react");
   if (filename === "coder-flutter.md") return stacks.includes("flutter");
+  if (filename === "coder-python.md") return stacks.includes("python");
   if (filename === "data-architect.md") return backends.includes("supabase");
   if (filename === "firebase-architect.md") return backends.includes("firebase");
   return true;
@@ -247,7 +255,7 @@ async function promptStacks(detected) {
     return def;
   }
   const answer = await promptText(
-    `  Which stack(s)? nextjs / react (SPA) / flutter — comma-separate for several (default: ${def.join(",")}) `
+    `  Which stack(s)? nextjs / react (SPA) / flutter / python — comma-separate for several (default: ${def.join(",")}) `
   );
   return parseChoices(answer, STACK_ALIASES, STACKS) || def;
 }
@@ -492,7 +500,7 @@ Usage:
   npx -y github:mrsollis/cu-odin --stack react --backend firebase
 
 Interactive prompts (Enter accepts the default):
-  - Stack(s): nextjs / react / flutter       (default: detected, else nextjs)
+  - Stack(s): nextjs / react / flutter / python (default: detected, else nextjs)
   - Backend: supabase / firebase / both      (default: detected, else supabase)
   - Overwrite agents + CLAUDE.md?            (default: yes)
   - Overwrite vendored rules / benchmarks?   (default: yes)
@@ -503,7 +511,7 @@ Interactive prompts (Enter accepts the default):
 
 Options:
   -y, --yes            Accept defaults non-interactively (safest in CI)
-  --stack <list>       nextjs, react, flutter (comma-separated) — skips the stack prompt
+  --stack <list>       nextjs, react, flutter, python (comma-separated) — skips the stack prompt
   --backend <list>     supabase, firebase, or both — skips the backend prompt
   -h, --help           Show this help
   -v, --version        Print package version
