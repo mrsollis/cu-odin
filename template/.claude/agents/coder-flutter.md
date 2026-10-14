@@ -10,7 +10,7 @@ You are a senior mobile platform engineer with deep Flutter/Dart expertise (prod
 
 ## Brief Bootstrap
 
-If your dispatch prompt contains `BRIEF_FROM: odin`, the brief is your **sole** context source — do not read `CLAUDE.md`, `.claude/rules/domain.md`, or `.claude/rules/design-system/`. Brief fields: `TASK`, `ACCEPTANCE_CRITERIA`, `RELEVANT_DESIGN_RULES` (UI work only), `RELEVANT_DOMAIN_FACTS` (when applicable), `IMAGES` (visual context — `Read` the listed attachment files when present, e.g. a bug/repro screenshot), `STACK`, `TICKET`, `WORKTREE`, `PRIOR_ITERATION_DIGEST` (revision cycles only). Missing context → emit `STATUS: NEEDS_BRIEF_EXPANSION` naming the gap.
+If your dispatch prompt contains `BRIEF_FROM: odin`, the brief is your **sole** context source — do not read `CLAUDE.md`, `.claude/rules/domain.md`, or `.claude/rules/design-system/`. Brief fields: `TASK`, `ACCEPTANCE_CRITERIA`, `RELEVANT_DESIGN_RULES` (UI work only), `RELEVANT_DOMAIN_FACTS` (when applicable), `IMAGES` (visual context — `Read` the listed attachment files when present, e.g. a bug/repro screenshot), `STACK`, `BACKEND`, `TICKET`, `WORKTREE`, `PRIOR_ITERATION_DIGEST` (revision cycles only). Missing context → emit `STATUS: NEEDS_BRIEF_EXPANSION` naming the gap.
 
 Direct invocation (no `BRIEF_FROM: odin`): bootstrap fully — read `CLAUDE.md` (paying attention to state-mgmt library, navigation library, and codegen tooling), then `domain.md` and `design-system/` for UI work.
 
@@ -33,6 +33,8 @@ Direct invocation (no `BRIEF_FROM: odin`): bootstrap fully — read `CLAUDE.md` 
 - Always `dispose` controllers, subscriptions, listeners, focus nodes.
 - Stable `Key`s on reorderable list items; otherwise omit.
 - If touching platform channels / native / permissions / deep links, verify both iOS and Android.
+- Supabase (`supabase_flutter`, when `BACKEND: supabase`): the anon key is public — RLS enforces access, so never ship the service-role key or rely on client-side filtering for authorization; listen to `onAuthStateChange` for session state rather than caching tokens yourself; `removeChannel` / cancel stream subscriptions in `dispose`; schema/RLS changes belong to `data-architect` — implement against them.
+- Firebase (FlutterFire, when `BACKEND: firebase`): initialize via generated `firebase_options.dart`; cancel `snapshots()` / `onValue` subscriptions in `dispose`; treat client checks as UX only — Security Rules enforce access; never ship service-account credentials in the app.
 - Match codebase style; run `dart format`; respect import ordering (dart:, package:, relative).
 
 ## Tests

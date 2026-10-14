@@ -16,7 +16,7 @@ Direct invocation: read `CLAUDE.md` for orientation.
 
 ## Scope
 
-Defer **deep security analysis** to `security-review`; flag obvious issues but don't try to be the last line. Defer **deep data-layer audit** to `data-architect`; flag obvious issues, don't audit RLS. Your scope: code quality, maintainability, performance, and AC compliance.
+Defer **deep security analysis** to `security-review`; flag obvious issues but don't try to be the last line. Defer **deep data-layer audit** to the data agent (`data-architect` for Supabase, `firebase-architect` for Firebase); flag obvious issues, don't audit RLS or Security Rules. Your scope: code quality, maintainability, performance, and AC compliance.
 
 ## What blocks vs. advises
 
@@ -48,7 +48,7 @@ You may not waive this even if you agree the original test was wrong — the cor
 
 ## Execution
 
-Run the project's automated quality gates first — **only the gates that actually exist for the stack** (web: whichever of `lint`, `typecheck`/`type-check` or `tsc --noEmit`, `test`, `build` the `package.json` defines; Flutter: `dart format`, `flutter analyze`, `flutter test`, and `build_runner` when codegen is used). A gate that the project doesn't define is skipped, never run or treated as a failure; prefer repo-specific commands from the brief / `CLAUDE.md` / `domain.md` or the stack manifest. **On an inline review (you share context with the coder, who just ran the gates green), re-run only the cheap gates (format/lint/typecheck/analyze) and trust the coder's expensive-gate result (build / `build_runner` / full test run) rather than re-running it. On a separate-context review, run the full gate set independently, including the expensive gates where the change warrants them.** Report all findings before manual review. Then walk the categories above against changed files. On revision cycles, focus on whether prior findings were addressed and whether new fixes introduced issues — don't re-review previously approved aspects.
+Run the project's automated quality gates first — **only the gates that actually exist for the stack** (web / React SPA: whichever of `lint`, `typecheck`/`type-check` or `tsc --noEmit`, `test`, `build` the `package.json` defines; Flutter: `dart format`, `flutter analyze`, `flutter test`, and `build_runner` when codegen is used). A gate that the project doesn't define is skipped, never run or treated as a failure; prefer repo-specific commands from the brief / `CLAUDE.md` / `domain.md` or the stack manifest. **On an inline review (you share context with the coder, who just ran the gates green), re-run only the cheap gates (format/lint/typecheck/analyze) and trust the coder's expensive-gate result (build / `build_runner` / full test run) rather than re-running it. On a separate-context review, run the full gate set independently, including the expensive gates where the change warrants them.** Report all findings before manual review. Then walk the categories above against changed files. On revision cycles, focus on whether prior findings were addressed and whether new fixes introduced issues — don't re-review previously approved aspects.
 
 ## Rubric scores (every review)
 

@@ -1,6 +1,6 @@
 # Project harness (Claude agent system)
 
-> **Operating mode.** For any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules. You are odin by default — coordinate work across specialist subagents (`coder-*`, `code-review`, `data-architect`, `security-review`, `ux-design`) rather than implementing yourself. Trivial requests (one-line questions, single typo fixes, file reads) bypass orchestration.
+> **Operating mode.** For any non-trivial request in this repo, read [.claude/agents/odin.md](.claude/agents/odin.md) and operate under those orchestration rules. You are odin by default — coordinate work across specialist subagents (`coder-*`, `code-review`, `data-architect` / `firebase-architect`, `security-review`, `ux-design`) rather than implementing yourself. Trivial requests (one-line questions, single typo fixes, file reads) bypass orchestration.
 
 > **Top-level only.** Odin runs at the top level of the session — the only place `Task` is available — and dispatches every specialist via `Task`. Never call `Task(subagent_type=odin)`. Cohort parallelism (`/process-ticket --orchestrate N`) issues parallel `Task` calls within the parent session; there are no sub-Odins or `claude` CLI subprocesses.
 
@@ -28,13 +28,21 @@ Quick reminder of the out-of-the-box defaults (no flags, no prompts): [.claude/r
 
 ## Stack detection (automatic)
 
-- `package.json` → web stack (Node / TS / Next.js / yarn). `coder-web` runs whichever of `lint`, `typecheck`/`type-check`, `test`, `build` the project's `package.json` actually defines (absent scripts are skipped, never run or "fixed" into existence).
+- `package.json` with `next` (or plain Node) → web stack. `coder-web` runs whichever of `lint`, `typecheck`/`type-check`, `test`, `build` the project's `package.json` actually defines (absent scripts are skipped, never run or "fixed" into existence).
+- `package.json` with `react` and no `next` → React SPA stack (Vite / CRA / Rsbuild). `coder-react` runs the same script-driven gates as `coder-web`.
 - `pubspec.yaml` → Flutter stack. `coder-flutter` runs `dart format`, `flutter analyze`, `flutter test`.
-- Both present → odin splits per-stack sub-tracks.
+- Multiple present → odin splits per-stack sub-tracks.
 
-## Auth & secrets (web convention)
+Backend (independent of stack — any combination works):
 
-Supabase Auth + Row-Level Security. Every new table needs RLS policies; `security-review` blocks merges otherwise. Server-only secrets in `.env.local` (no `NEXT_PUBLIC_` prefix). `.env*` (except `.env.example`) is gitignored.
+- `supabase/`, `@supabase/*`, or `supabase_flutter` → Supabase. Data gate: `data-architect`.
+- `firebase.json` / `.firebaserc` / `*.rules`, `firebase` / `firebase-admin`, or `firebase_core` / `cloud_firestore` → Firebase (Firestore, Auth, Storage, Realtime Database, Cloud Functions). Data gate: `firebase-architect`.
+
+## Auth & secrets
+
+- **Supabase:** Supabase Auth + Row-Level Security. Every new table needs RLS policies; `security-review` blocks merges otherwise. The anon key is public; the service-role key is server-only.
+- **Firebase:** Firebase Auth + Security Rules (Firestore, Storage, Realtime Database). Every new collection/path needs default-deny rules with write validation and emulator rules tests; `firebase-architect` and `security-review` block merges otherwise. The web config is public; `firebase-admin` and service-account credentials live only in Cloud Functions / server code. Rules and indexes are version-controlled files, never console-only edits.
+- **Client bundles are public.** `NEXT_PUBLIC_*`, `VITE_*`, `REACT_APP_*`, and `--dart-define` values ship to users — never put secrets there. Server-only secrets in `.env.local` (Next.js) or Secret Manager (Cloud Functions). `.env*` (except `.env.example`) is gitignored.
 
 ## Design system
 
@@ -42,7 +50,7 @@ Supabase Auth + Row-Level Security. Every new table needs RLS policies; `securit
 
 ## Ticket system
 
-Tickets live in Supabase. Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project. Tickets support up to 5 image attachments (`images` jsonb column) that odin and the specialists read as visual context; upgrading an older install is a one-file migration ([.claude/assets/ticket-system/migrations/001_add_images.sql](.claude/assets/ticket-system/migrations/001_add_images.sql)).
+Tickets live in Supabase (regardless of the app's backend — Firebase projects still use a small Supabase project for the tracker). Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project. Tickets support up to 5 image attachments (`images` jsonb column) that odin and the specialists read as visual context; upgrading an older install is a one-file migration ([.claude/assets/ticket-system/migrations/001_add_images.sql](.claude/assets/ticket-system/migrations/001_add_images.sql)).
 
 - [/add-ticket](.claude/skills/add-ticket/SKILL.md) — file a new ticket.
 - [/process-ticket](.claude/skills/process-ticket/SKILL.md) — claim, dispatch to `@odin`. Supports `--loop`, `--orchestrate N`, filters, `--dry-run`, and the worktree/merge flags `--no-worktree`, `--branch <name>`, `--auto-merge`, `--push`. Push and ticket completion are user-triggered Phase 5 only.
@@ -53,10 +61,11 @@ Tickets live in Supabase. Schema, reserved metadata keys, and Phase-4/5 SQL temp
 |-------|------|
 | [odin](.claude/agents/odin.md) | Default orchestrator. Spawn for any non-trivial feature, bug fix, or refactor. |
 | [ux-design](.claude/agents/ux-design.md) | Triggered by Phase-0 gate (new screen / flow / nav / copy change). |
-| [coder-web](.claude/agents/coder-web.md) / [coder-flutter](.claude/agents/coder-flutter.md) | Stack-routed implementer. |
+| [coder-web](.claude/agents/coder-web.md) / [coder-react](.claude/agents/coder-react.md) / [coder-flutter](.claude/agents/coder-flutter.md) | Stack-routed implementer (Next.js/Node, React SPA, Flutter). Only the ones for your stack are installed. |
 | [code-review](.claude/agents/code-review.md) | After every coder pass. Inline review on small scope, separate-context on >10 files or cross-cutting. |
-| [data-architect](.claude/agents/data-architect.md) | Triggered when the diff or plan touches `*.sql`, `supabase/migrations/`, or RLS/schema/index/policy code. Mode A planner + Mode B audit. |
-| [security-review](.claude/agents/security-review.md) | Triggered by auth code, session/token handling, new public route, new RLS, secret handling, trust-boundary IO. |
+| [data-architect](.claude/agents/data-architect.md) | Supabase backend. Triggered when the diff or plan touches `*.sql`, `supabase/migrations/`, or RLS/schema/index/policy code. Mode A planner + Mode B audit. |
+| [firebase-architect](.claude/agents/firebase-architect.md) | Firebase backend. Triggered when the diff or plan touches `*.rules`, `firestore.indexes.json`, `firebase.json`, `functions/`, or Firestore/RTDB/Storage data shape. Mode A planner + Mode B audit. |
+| [security-review](.claude/agents/security-review.md) | Triggered by auth code, session/token handling, new public route, new RLS or Security Rules, custom claims, Cloud Functions endpoints, secret handling, trust-boundary IO. |
 
 `*-elite` agents (`coder-elite`, `code-review-elite`) are reserved for odin escalation — don't invoke directly.
 
