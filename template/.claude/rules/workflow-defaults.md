@@ -9,7 +9,8 @@ One-page reference for the **out-of-the-box** behavior of the dispatcher and the
 ### Claiming
 - `/process-ticket`, `next`, `--loop`, `--orchestrate N` → **claim immediately, never ask.** Only `list` prompts you to choose.
 - Picks the **top ready ticket**: priority `critical > high > medium > low`, tie-break `tier ASC`, then FIFO (`created_at`). "Ready" = `status='backlog'` **and** every `depends_on` id is `complete`.
-- Claim is atomic (`FOR UPDATE SKIP LOCKED`) — parallel dispatch never double-assigns.
+- Claim is atomic (`FOR UPDATE SKIP LOCKED` on Supabase; `updateTime`-precondition compare-and-set on the Firestore tracker) — parallel dispatch never double-assigns.
+- Tracker: Supabase by default; Firestore via the Firebase MCP when `.claude/ticket-tracker.json` says `firebase` (written by the installer for Firebase-only projects).
 
 ### Mode
 - **Interactive by default.** Headless only when the message contains `headless` / `bifrost`, or the harness signals `Auto mode active`.

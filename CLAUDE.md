@@ -84,6 +84,8 @@ Tickets can also carry up to **5 image attachments** in an `images` jsonb column
 
 The orchestrator reads/writes tickets via the Supabase MCP tool, so make sure that's wired up in your Claude Code config.
 
+**Firebase-only projects** keep tickets in Firestore instead: the installer writes `.claude/ticket-tracker.json` (`"backend": "firebase"`, `projectId` from `.firebaserc`), and `/add-ticket`, `/process-ticket`, and odin route every ticket read/write through the Firebase MCP's `firestore_*` tools (`npx -y firebase-tools@latest mcp`) — same fields and workflow, compare-and-set claims. Setup and recipes: `.claude/rules/ticket-firestore.md`.
+
 ## When to invoke each agent
 
 You usually don't — odin handles routing. But for the rare case you want to call one directly:
@@ -122,7 +124,7 @@ If a repo contains several, odin splits work into per-stack sub-tracks.
 - An Anthropic org with standard (30-day) data retention — the elite agents' fable round (attempts 5–6) runs on Fable, which returns API errors on zero-data-retention orgs
 - Node 16.7+ (only for the installer)
 - For the ticket system: a Supabase project + the Supabase MCP server configured in Claude Code — or, for Firebase-only projects, a Firebase MCP server with Firestore read/write (tickets then live in Firestore; see `.claude/rules/ticket-firestore.md`)
-- For Firebase apps: the Firebase CLI, and optionally the Firebase MCP server (`npx -y firebase-tools mcp`) so `firebase-architect` can introspect live rules/data
+- For Firebase apps: the Firebase CLI, and optionally the Firebase MCP server (`npx -y firebase-tools@latest mcp`) so `firebase-architect` can introspect live rules/data
 
 ## Updating the harness in a project
 
