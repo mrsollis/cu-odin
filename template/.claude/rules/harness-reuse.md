@@ -19,7 +19,7 @@ Then:
 
 1. Write the project-specific [.claude/rules/domain.md](domain.md).
 2. Fill in [.claude/rules/design-system/](design-system/).
-3. Apply [.claude/assets/ticket-system/schema.sql](../assets/ticket-system/schema.sql) to the project's Supabase (Firebase-backed apps still use a Supabase project for the tracker).
+3. Apply [.claude/assets/ticket-system/schema.sql](../assets/ticket-system/schema.sql) to the project's Supabase — or, for Firebase-only projects (`.claude/ticket-tracker.json` → `firebase`), configure a Firebase MCP server with Firestore read/write and add the rules block from [ticket-firestore.md](ticket-firestore.md).
 
 Nothing else to configure — the Supabase project id lives in the Supabase MCP server config.
 

@@ -14,7 +14,7 @@
 
 > **Cheaper by default.** [.claude/skills/cheaper/SKILL.md](.claude/skills/cheaper/SKILL.md) is active from the start of every session: strip responses to the bare answer — no preamble, recap, follow-up offers, or unrequested features. This governs conversational responses; it never overrides odin's orchestration gates, the plan post, or required safety output. Deactivate only if the user says "stop using cheaper".
 
-> **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/harness-reuse.md`, `.claude/rules/workflow-defaults.md`, `.claude/skills/{add-ticket,process-ticket,cheaper}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
+> **Vendored harness — do not edit in the host repo.** `CLAUDE.md`, `.claude/agents/*.md`, `.claude/rules/ticket-schema.md`, `.claude/rules/ticket-firestore.md`, `.claude/rules/harness-reuse.md`, `.claude/rules/workflow-defaults.md`, `.claude/skills/{add-ticket,process-ticket,cheaper}/`, and `.claude/assets/ticket-system/` ship from [cu-odin](https://github.com/mrsollis/cu-odin) and are overwritten on sync. Raise changes against cu-odin. Anything else under `.claude/` is host-repo territory.
 
 ## Read first
 
@@ -51,7 +51,7 @@ Backend (independent of stack — any combination works):
 
 ## Ticket system
 
-Tickets live in Supabase (regardless of the app's backend — Firebase projects still use a small Supabase project for the tracker). Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project. Tickets support up to 5 image attachments (`images` jsonb column) that odin and the specialists read as visual context; upgrading an older install is a one-file migration ([.claude/assets/ticket-system/migrations/001_add_images.sql](.claude/assets/ticket-system/migrations/001_add_images.sql)).
+Tickets live in Supabase — or, when Firebase is the project's only backend (`.claude/ticket-tracker.json` → `firebase`), in Firestore via the Firebase MCP only ([.claude/rules/ticket-firestore.md](.claude/rules/ticket-firestore.md)). Schema, reserved metadata keys, and Phase-4/5 SQL templates: [.claude/rules/ticket-schema.md](.claude/rules/ticket-schema.md). Apply [.claude/assets/ticket-system/schema.sql](.claude/assets/ticket-system/schema.sql) once per project. Tickets support up to 5 image attachments (`images` jsonb column) that odin and the specialists read as visual context; upgrading an older install is a one-file migration ([.claude/assets/ticket-system/migrations/001_add_images.sql](.claude/assets/ticket-system/migrations/001_add_images.sql)).
 
 - [/add-ticket](.claude/skills/add-ticket/SKILL.md) — file a new ticket.
 - [/process-ticket](.claude/skills/process-ticket/SKILL.md) — claim, dispatch to `@odin`. Supports `--loop`, `--orchestrate N`, filters, `--dry-run`, and the worktree/merge flags `--no-worktree`, `--branch <name>`, `--auto-merge`, `--push`. Push and ticket completion are user-triggered Phase 5 only.

@@ -61,7 +61,7 @@ Audit rules files, indexes, Functions, and any client code that reads/writes Fir
 4. **Indexes & performance.** Every composite query has an index entry; no unbounded listeners on large collections; pagination; hot-spot writes (sequential IDs, single counters) addressed; `get()`/`exists()` calls in rules counted against the 10/20 limit.
 5. **Storage rules.** Path ownership, `request.resource.size` and `contentType` limits, no public write; read scoped unless intentionally public.
 6. **RTDB rules** (if present). No root-level `.read`/`.write: true`; `.validate` on writes; `.indexOn` for queried children.
-7. **Cloud Functions.** Callables check `request.auth` (and App Check where enabled); HTTP functions verify ID tokens; Admin SDK bypasses rules — so every Function enforces its own authorization; triggers idempotent; no secrets in source (use Secret Manager / `defineSecret`); least-privilege service accounts.
+7. **Cloud Functions** (Node or Python — `on_call` / `on_request` / `firestore_fn` etc. in Python). Callables check `request.auth` / `req.auth` (and App Check where enabled); HTTP functions verify ID tokens; Admin SDK bypasses rules — so every Function enforces its own authorization; triggers idempotent; no secrets in source (use Secret Manager / `defineSecret`); least-privilege service accounts.
 8. **Client SDK usage.** No Admin SDK or service-account JSON in client bundles; web config treated as public; App Check initialized when the project uses it; listeners unsubscribed.
 9. **Rules tests.** Present for every changed match block, cover allow + deny + unauthenticated + cross-user, and pass under the emulator.
 

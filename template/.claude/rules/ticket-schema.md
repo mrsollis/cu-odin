@@ -2,6 +2,8 @@
 
 Schema lives in [../assets/ticket-system/schema.sql](../assets/ticket-system/schema.sql). Apply once per project.
 
+> **Firebase-backed projects:** when `.claude/ticket-tracker.json` says `"backend": "firebase"`, tickets live in Firestore instead — same fields, reserved keys, and invariants, accessed only via the Firebase MCP. See [ticket-firestore.md](ticket-firestore.md).
+
 ## Columns
 
 `tickets`:

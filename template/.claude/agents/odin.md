@@ -107,7 +107,7 @@ Resolve once at session start from the repo (re-check per ticket only if the tic
 | `supabase/`, `@supabase/*` dep, `supabase_flutter`, Python `supabase` | `supabase` | `data-architect` |
 | `firebase.json` / `.firebaserc` / `*.rules`, `firebase` / `firebase-admin` dep, `firebase_core` / `cloud_firestore`, Python `firebase-admin` | `firebase` | `firebase-architect` |
 
-"The data agent" below means whichever matches the files in scope; a repo with both backends routes each data-touching file to its own agent (parallel dispatch). If the routed agent file is missing from `.claude/agents/` (installer skipped it), emit `STATUS: HARNESS_ERROR — <agent> not installed; re-run the cu-odin installer with --stack/--backend` rather than substituting another agent. Firebase `functions/` code is implemented by the coder whose stack matches its manifest (`functions/package.json` → `coder-web`), but its trigger/authorization surface is audited by `firebase-architect`.
+"The data agent" below means whichever matches the files in scope; a repo with both backends routes each data-touching file to its own agent (parallel dispatch). If the routed agent file is missing from `.claude/agents/` (installer skipped it), emit `STATUS: HARNESS_ERROR — <agent> not installed; re-run the cu-odin installer with --stack/--backend` rather than substituting another agent. Firebase `functions/` code is implemented by the coder whose stack matches its manifest (`functions/requirements.txt` / `main.py` → `coder-python`; `functions/package.json` → `coder-web`), and its trigger/authorization surface is audited by `firebase-architect` (data gate) and `security-review` (callable/HTTP functions). Supabase Edge Functions (`supabase/functions/**`) are Deno/TypeScript → always `coder-web`, never `coder-python`.
 
 ## Adaptive specialist briefs
 
@@ -202,7 +202,7 @@ After synthesis:
 
 1. Author a flat **acceptance criteria** list — one item per user-visible behavior, testable, with `AC-N` ids. Persist to `metadata.acceptance_criteria`.
 2. **Compute and persist `metadata.gate_set`** — which gates fire and why, plus the `effort_size` from the sizing step, so review/audit can reconstruct the run.
-3. Identify parallel-safe tracks. Per-track stack routing: `*.tsx`/`*.ts`/`*.css`/`package.json` → the JS stack resolved above (`web` for Next.js/Node, `react` for an SPA; in a monorepo, the nearest `package.json` decides); `*.dart`/`pubspec.yaml` → flutter; `*.py`/`pyproject.toml`/`requirements*.txt` → python. Mixed tracks split into per-stack sub-tracks.
+3. Identify parallel-safe tracks. Per-track stack routing: `*.tsx`/`*.ts`/`*.css`/`package.json` → the JS stack resolved above (`web` for Next.js/Node, `react` for an SPA; in a monorepo, the nearest `package.json` decides); `*.dart`/`pubspec.yaml` → flutter; `*.py`/`pyproject.toml`/`requirements*.txt` (including `functions/`) → python. Mixed tracks split into per-stack sub-tracks.
 4. Post the plan + activated gate set. In interactive mode, wait for approval. In headless mode, proceed.
 
 Plan format:
@@ -326,6 +326,8 @@ Dispatch `security-review` across changed files. On `STATUS: NEEDS_REMEDIATION` 
 For high-risk full-pipeline runs (≥3 active gates AND data+security both fired), spawn one `code-review` pass against the full diff with an evaluator brief: "Are the activated gates adequate for this scope, or did anything slip through the cracks?" One pass, advisory only — does not loop.
 
 ## Phase 4 — QA handoff
+
+Ticket writes below are SQL for the Supabase tracker. If `.claude/ticket-tracker.json` says `"backend": "firebase"`, perform the same writes (and the Phase-5 read-back) via the Firebase MCP per [ticket-firestore.md](../rules/ticket-firestore.md) — never any other path.
 
 After all activated gates clear:
 

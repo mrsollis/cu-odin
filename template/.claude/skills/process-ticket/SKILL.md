@@ -8,6 +8,8 @@ version: 2.2.0
 
 Dispatcher / queue runner for the project's `public.tickets` table. The Supabase project id is read from the Supabase MCP server config — there is no per-repo config to fill in. Ticket ids follow the canonical `T-<N>` format assigned by the database (`next_ticket_id()`).
 
+**Tracker backend.** If `.claude/ticket-tracker.json` says `"backend": "firebase"`, tickets live in Firestore: follow [ticket-firestore.md](../../rules/ticket-firestore.md) for every ticket read/write — through the Firebase MCP only, never scripts/CLI/SDKs — in place of the SQL below. Everything else in this skill is unchanged. Note the tracker in the mode line (`Mode: interactive · tickets: firestore`).
+
 This skill **does not implement work**. Each claimed ticket is handed to [@odin](../../agents/odin.md), which runs the conditional pipeline (planning → activated-gates set per scope → coder/review loop with elite gate → QA handoff). Gates that don't match the planned scope are skipped — see odin.md for the trigger table. The dispatcher owns claim, branching, worktree lifecycle, dependency resolution, and end-of-run cleanup; gate decisions live in odin.
 
 **Every ticket runs in its own fresh git worktree by default** (single-ticket and cohort alike), branched off a freshly-pulled base branch. `--no-worktree` opts a single ticket back into in-place branching. Odin also runs an up-front **effort-sizing** pass so small tickets stay cheap — it tunes discretionary effort (planning depth, review context, fan-out), **never** a safety gate. See odin.md.
